@@ -194,9 +194,7 @@ public class CustomerRealm extends AuthorizingRealm {
     protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
         System.out.println("====CustomerRealm.授权====");
         // 1.获取登录用户的信息
-        DecodedJWT userInfo = (DecodedJWT) principalCollection.getPrimaryPrincipal();
-        String user_id = userInfo.getClaims().get("user_id").asString();
-        String username = userInfo.getClaims().get("username").asString();
+        String user_id=(String) principalCollection.getPrimaryPrincipal();
         // 2.添加角色和权限
         SimpleAuthorizationInfo simpleAuthorizationInfo = new SimpleAuthorizationInfo();
         User user = userService.findRolesByUserId(Integer.parseInt(user_id));
@@ -208,28 +206,26 @@ public class CustomerRealm extends AuthorizingRealm {
             for(Permission permission : role_permission.getPermissions()){
                 //2.1.1添加权限
                 simpleAuthorizationInfo.addStringPermission(permission.getPermission());
+                System.out.println("permissions: "+permission.getPermission());
             }
         }
         return simpleAuthorizationInfo;
     }
-
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
         System.out.println("====CustomerRealm.认证====");
-
-        System.out.println("token.getprincipal: "+(String)token.getPrincipal());
         DecodedJWT tokenInfo = JWTUtils.getTokenInfo((String) token.getPrincipal());
         String accessToken = (String) token.getPrincipal();
+        String user_id = tokenInfo.getClaims().get("user_id").asString();
         /*
         String user_id = tokenInfo.getClaims().get("user_id").asString();
         String username = tokenInfo.getClaims().get("username").asString();
-
         可以根据 user表的 status字段锁定账户
         if(user.getStatus() == -1){
         throw new LockedAccountException("账户已被锁定");
         }
          */
-        return new SimpleAuthenticationInfo(tokenInfo,accessToken,this.getName());
+        return new SimpleAuthenticationInfo(user_id,accessToken,this.getName());
     }
 }
 ```
@@ -301,5 +297,154 @@ public class ShiroConfig {
 
 
 
-后续应该会实现把权限信息存入redis中。
+### 4. 将权限认证信息放到redis中
 
+
+
+#### 4.1 导入 redis依赖
+
+```xml
+<!--redis整合springboot-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.data</groupId>
+    <artifactId>spring-data-redis</artifactId>
+    <version>2.4.2</version>
+</dependency>
+```
+
+#### 4.2 配置redis连接
+
+```xml
+spring:
+  redis:
+    port: 6379
+    host: 47.110.154.185
+    database: 0
+```
+
+#### 4.3 确保redis服务开启
+
+#### 4.4在 shiro包下新建cache包 
+
+编写 RedisCache 和 RedisCacheManager
+
+```java
+public class RedisCacheManager<k,v> implements CacheManager {
+
+
+    @Override
+    public <K, V> Cache<K, V> getCache(String cacheName) throws CacheException {
+        System.out.println("cacheName: "+cacheName);
+        return new RedisCache<K,V>(cacheName);
+    }
+}
+```
+
+```java
+public class RedisCache<k,v> implements Cache<k,v> {
+    private String cacheName;
+    public RedisCache() {
+    }
+
+    public RedisCache(String cacheName) {
+        this.cacheName = cacheName;
+    }
+
+    private RedisTemplate getRedisTemplate(){
+        RedisTemplate redisTemplate = (RedisTemplate) ApplicationContextUtils.getBean("redisTemplate");
+        // RedisTemplate默认对对象进行操作  k是字符串 v就是对象 所以改变redisTemplte k的序列化方式 改为String的序列化方式
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        // Redis 的 Hash 结构   Map<String,Map<String, Object>>;
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        return redisTemplate;
+    }
+
+
+    @Override
+    // 从redis中获取缓存
+    public v get(k k) throws CacheException {
+        System.out.println("redis get key:"+k);
+        return (v) getRedisTemplate().opsForHash().get(this.cacheName,k.toString());
+    }
+
+    @Override
+    // 把查询数据库的东西放入缓存
+    public v put(k k, v v) throws CacheException {
+        System.out.println("redis put key:"+k);
+        System.out.println("redis put value:"+v);
+        getRedisTemplate().opsForHash().put(this.cacheName,k.toString(),v);
+        return null;
+    }
+
+    @Override
+    // 清空指定的缓存
+    public v remove(k k) throws CacheException {
+        System.out.println("===remove===");
+        return (v)getRedisTemplate().opsForHash().delete(this.cacheName,k.toString());
+    }
+
+    @Override
+    // 清空缓存
+    public void clear() throws CacheException {
+        System.out.println("===clear===");
+        getRedisTemplate().delete(this.cacheName);
+    }
+
+    @Override
+    public int size() {
+        return getRedisTemplate().opsForHash().size(this.cacheName).intValue();
+    }
+
+    @Override
+    public Set<k> keys() {
+        return getRedisTemplate().opsForHash().keys(this.cacheName);
+    }
+
+    @Override
+    public Collection<v> values() {
+        return getRedisTemplate().opsForHash().values(this.cacheName);
+    }
+}
+```
+
+
+
+4.5 更改 ShiroConfig 在getRealm中添加 RedisCache
+
+```java
+// 创建自定义realm
+@Bean
+public Realm getRealm(){
+    CustomerRealm customerRealm = new CustomerRealm();
+    // 开启缓存管理
+    customerRealm.setCacheManager(new RedisCacheManager<>());
+    customerRealm.setCachingEnabled(true); // 开启全局缓存
+    customerRealm.setAuthenticationCachingEnabled(true);// 认证缓存
+    customerRealm.setAuthenticationCacheName("authenticationCache");
+    customerRealm.setAuthorizationCachingEnabled(true);// 授权缓存
+    customerRealm.setAuthorizationCacheName("authorizationCache");
+    return customerRealm;
+}
+```
+
+分别给**认证信息**和**授权信息**缓存起名。传入参数 cacheName 这样采用 redis的hash存储结构，可以给缓存起名字。
+
+一个hash结构可以放入许多个用户的认证,授权信息。
+
+
+
+4.6 看看效果
+
+
+
+![image-20210312214758221](简单实用! 前后端分离 shiro + springboot + Jwt 实现权限管理.assets/image-20210312214758221.png)
+
+![image-20210312215039826](简单实用! 前后端分离 shiro + springboot + Jwt 实现权限管理.assets/image-20210312215039826.png)
+
+
+
+这样之后用户就不用查询数据库去获得认证和授权的数据了，而是先去缓存里找。
