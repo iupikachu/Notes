@@ -325,7 +325,7 @@ java -jar 命令启动时直接在后面跟上jvm参数
 
 
 
-
+-XX:NewSize=5242880 -XX:MaxNewSize=5242880 -XX:InitialHeapSize=10485760 -XX:MaxHeapSize=10485760 -XX:SurvivorRatio=8 -XX:PretenureSizeThreshold=10485760 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log
 
 
 
@@ -792,11 +792,11 @@ Jvm最多可以有 2048个Region ,Region的大小必须是2的倍数。比如1MB
 
 刚开始的时候，默认新生代对堆内存的占比是5%,也就是200MB左右的内存，大概100个Region。
 
-可以通过 "-XX：G1NewSizePercent" 设置新生代初始占比。
+可以通过 "**-XX：G1NewSizePercent**" 设置新生代初始占比。
 
 在系统运行中，Jvm会不停地给新生代增加更多的Region,但是最多新生代的占比不会超过 60%。
 
-可以通过 "-XX：G1MaxNewSizePercent"改变。
+可以通过 "**-XX：G1MaxNewSizePercent**"改变。
 
 
 
@@ -866,7 +866,7 @@ G1 就会通过之前说的，追踪每个Region回收时间，垃圾对象大�
 
 **条件:**
 
-G1 有一个参数 "**-XX：InitiatingHeapoccupancyPercent **" 默认值 45%
+G1 有一个参数（**IHOP**） "**-XX：InitiatingHeapoccupancyPercent **" 默认值 45%
 
 如果**老年代占据了堆内存的 45%的Region**,此时就会触发 新生代+老年代+大对象 一起回收的混合回收。
 
@@ -878,6 +878,7 @@ G1 有一个参数 "**-XX：InitiatingHeapoccupancyPercent **" 默认值 45%
 * **并发标记**：允许系统程序的运行，同时进行"GC Roots"追踪，追踪所有存活对象(间接引用的对象)。很耗时，要追踪全部的存活对象。但是是并发运行，对系统影响不大。Jvm还会对这个阶段，一些对象的修改记录起来，比如对象新建，对象失去引用。
 * **最终标记**：进入"stop the world" ，根据并发标记记录的对象修改，最终标记存活对象，垃圾对象。
 * **混合回收**：计算老年代中每个Region的存活对象数量，存活对象占比，执行垃圾回收的预期性能和效率。然后停止系统运行，全力以赴进行垃圾回收，为了控制垃圾回收时间在指定的范围，会对部分的region进行回收。
+* Mixed GC过程中会将多个老年代Region中仍存活的小对象集中到一个Region中，也就是说**Mixed GC会对老年代空间进行内存整理**
 
 
 
@@ -891,9 +892,9 @@ ps: 在最后一个阶段"**混合回收**"的时候，会停止程序运行，�
 
    " **-XX：G1HeapWastePercent**  "       默认值5% 。
 
-​		在混合回收时，都是基于复制算法的，把要回收Region的存活对象放入其他Region,然后这个Region中的垃圾对象全部清理，这样就会不断空出新的Region。一旦空出的Region数量达到了堆的 5%。就会立即停止混合回收。
+​		也就是在全局标记结束后能够统计出所有Cset内可被回收的垃圾占整对的比例值，如果超过5%，那么就会触发之后的多轮Mixed GC，如果不超过，那么会在之后的某次Young GC中重新执行全局并发标记。可以尝试适当的调高此阈值，能够适当的降低Mixed GC的频率。
 
-​		假如开始垃圾回收的时候，空闲的region就很多，比如10%，就不用多次回收了，基本一次回收就可以了。
+​		空闲的Region数量达到老年代堆内存的5%就会停止回收，比如正常是8次回收，但是到第4次，空闲Region达到5%了，就不进行后续的混合回收了。
 
 ​    ''**-XX:  G1MixedGCLiveThresholdPercnt**"    默认值 85% 。
 
@@ -923,13 +924,29 @@ ps: 在最后一个阶段"**混合回收**"的时候，会停止程序运行，�
 
 
 
+![image-20210318101504645](JVM.assets/image-20210318101504645.png)
+
+
+
+**为什么要选择 G1 垃圾处理器?**
+
+* G1在停顿时间上添加了预测机制，用户可以设置期望停顿时间，Stop The World时间相对可控。
+* G1的年轻代和老年代空间并不是固定的，当现有年轻代分区占满时，JVM会分配新的空闲Region加入到年轻代空间，老年代也是如此。还记得在CMS中出现的年轻代空间有大量浪费的情况吗？那将不再是问题。另一方面，由于无法保证每台机器的吞吐完全一致，不同机器的GC压力也是不一样的，该特性使得系统进程可以根据情况自行调整年轻代和老年代的空间大小，以应对不同的GC压力
+* G1 GC的回收过程中有内存整理，理论上不会产生内存碎片！
+
+* G1 很适合大内存的机器，因为如果是 ParNew+CMS，每次Gc都是内存快满了，此时一下子要回收对象太多，导致gc停顿时间太长。针对大内存机器，G1很适合。
 
 
 
 
 
+**如何尽量减少Mixed Gc 频率?**
 
+Mixed gc 触发条件是老年代到达 IHOP 设置的值。
 
+* 让垃圾对象尽可能在新生代就被回收掉，让短命对象不进入老年代，这就要求根据具体应用系统来合理设置新生代Eden大小和Survivor的大小。
+* 将新生代分配更大空间，老年代设置为较小值。但是如果有较多需要长期存活的对象的话，容易导致Full Gc 和 OOM。
+* 提高 IHOP 的值。虽然降低了Mixed Gc 频率，单、但导致老年代存在过多对象，增加了每次老年代回收时"**并发标记**"阶段的计算负担和"**mixed gc**"阶段计算和预估的负担。不适合CPU负载较高的计算型业务系统。
 
 
 
@@ -1040,6 +1057,51 @@ FullGC频率，YoungGC耗时，每次GC过后老年代的垃圾回收情况；
 （4）还会设置一些额外的参数：-XX:-OmitStackTraceInFastThrow
 还有打印GC日志，发生OOM的时候dump内存快照参数。
 （5）还有一点，如果没有发生什么特殊的问题，不会对其他的参数进行优化。能简单设置就采用简单的设置。
+
+
+
+
+
+
+
+
+
+### 5.日志分析
+
+
+
+```java
+public class Demo1 {
+    public static void main(String[] args) {
+        byte[] array1 = new byte[2*1024*1024];
+        array1 = new byte[2*1024*1024];
+        array1 = new byte[2*1024*1024];
+        array1 = null;
+
+        byte[] array2 = new byte[128*1024];
+        byte[] array3 = new byte[2*1024*1024];
+
+    }
+}
+```
+
+![image-20210320160743587](JVM.assets/image-20210320160743587.png)
+
+
+
+![image-20210320155547208](JVM.assets/image-20210320155547208.png)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
