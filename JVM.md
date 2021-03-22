@@ -325,9 +325,29 @@ java -jar 命令启动时直接在后面跟上jvm参数
 
 
 
--XX:NewSize=5242880 -XX:MaxNewSize=5242880 -XX:InitialHeapSize=10485760 -XX:MaxHeapSize=10485760 -XX:SurvivorRatio=8 -XX:PretenureSizeThreshold=10485760 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log
+#### 1.10 元空间
+
+Java8 取消了PermGen。取而代之的是MetaSpace，方法区在java8以后移至MetaSpace。 Jdk8开始把类的元数据放到本地内存（native heap），称之为MetaSpace
 
 
+
+理论上本地内存剩余多少，MetaSpace就有多大，当然我们也不可能无限制的增大MetaSpace，需要用-XX:MaxMetaSpaceSize来指定MetaSpace区域大小。 
+
+关于used capacity commited 和reserved，在stackoverflow找到个比较靠谱的答案，我尝试翻译一下： MetaSpace由一个或多个Virtual Space（虚拟空间）组成。虚拟空间是操作系统的连续存储空间，虚拟空间是按需分配的。当被分配时，虚拟空间会向操作系统预留（reserve）空间，但还没有被提交（committed）。
+
+MetaSpace的预留空间（reserved）是全部虚拟空间的大小。 虚拟空间的最小分配单元是MetaChunk（也可以说是Chunk）。
+
+当新的Chunk被分配至虚拟空间时，与Chunk相关的内存空间被提交了（committed）。MetaSpace的committed指的是所有Chunk占有的空间。 
+
+每个Chunk占据空间不同，当一个类加载器（Class Loader）被gc时，所有与之关联的Chunk被释放（freed）。这些被释放的Chunk被维护在一个全局的释放数组里。
+
+MetaSpace的capacity指的是所有未被释放的Chunk占据的空间。 这么看gc日志发现自己committed是4864K，capacity4486K。有一部分的Chunk已经被释放了，代表有类加载器被回收了
+
+
+
+附上原文链接：
+
+https://stackoverflow.com/questions/40891433/understanding-metaspace-line-in-jvm-heap-printout 
 
 
 
@@ -604,7 +624,7 @@ Minor gc 存活对象总大小 = M.memory      Survivor区可用空间 = S.memor
 
 5.哪些情况下Minor gc 的对象会进入老年代?
 
-
+Minor gc 后，存活对象太多，Survivor区放不下。存活对象直接进入老年代。
 
 **Stop the World** 问题
 
@@ -956,9 +976,29 @@ Mixed gc 触发条件是老年代到达 IHOP 设置的值。
 
 ### 4.日处理上亿数据的系统(分配内存区域大小)
 
-优化原则：
+**优化思路：**
+
+1.上线前，根据预期的并发量、平均每个任务的内存需求大小等，然后评估需要几台机器，需要怎样的配置
+
+2.根据系统的任务处理速度，评估内存使用情况，然后合理分配Eden、Survivor,老年代的内存大小。
+
+**总体原则:**
+
+短命对象在young gc就被回收，不要进入老年代。长期存活的对象，尽早进入老年代，不要在新生代复制来复制去。对系统响应时间敏感且内存需求大的，建议采用G1回收器。
+
+
 
 在给定的内存大小合理的前提下，合理设置 eden、survivor、老年代的内存比例，尽可能让存活的对象放入到survivor区（下次Minor Gc就回收，不进入老年代），延长两次 Full gc之间的时间。
+
+
+
+**评估指标:**
+
+* 根据内存增速来评估多久进行 young Gc
+* 根据每次Young Gc的存活，评估Survivor区大小是否设置合理
+* 评估多久进行一次"Stop the World"，是否可以接受。
+
+
 
 
 
@@ -1058,7 +1098,7 @@ FullGC频率，YoungGC耗时，每次GC过后老年代的垃圾回收情况；
 还有打印GC日志，发生OOM的时候dump内存快照参数。
 （5）还有一点，如果没有发生什么特殊的问题，不会对其他的参数进行优化。能简单设置就采用简单的设置。
 
-
+下次分享 ：你说你精通jvm调优，能够说下G1工作原理以及整体流程吗？
 
 
 
@@ -1093,6 +1133,144 @@ public class Demo1 {
 
 
 
+#### 5.1 年轻代gc日志分析
+
+jvm参数:
+
+```bash
+-XX:NewSize=5242880 -XX:MaxNewSize=5242880 -XX:InitialHeapSize=10485760 -XX:MaxHeapSize=10485760 -XX:SurvivorRatio=8 -XX:PretenureSizeThreshold=10485760 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log
+```
+
+
+
+情况一:
+
+​	老年代垃圾回收，发生young gc。进入 Survivor区700kb存活对象,下一次young gc前执行动态年龄判断，这700kb对象进入老年代。
+
+情况二:
+
+​	老年代垃圾回收，发生young gc 。有2MB存活对象和 500kb的未知存活对象。survivor区只有1MB。这时，500kb未知存活对象进入Survivor区，2MB存活对象进入老年代。	
+
+
+
+![image-20210322142942783](JVM.assets/image-20210322142942783.png)
+
+<img src="JVM.assets/image-20210322153329774.png" alt="image-20210322153329774" style="zoom:67%;" />
+
+<img src="JVM.assets/image-20210322153423278.png" alt="image-20210322153423278" style="zoom:67%;" />
+
+
+
+如下是日志
+
+![image-20210322142153373](JVM.assets/image-20210322142153373.png)
+
+
+
+
+
+
+
+#### 5.2 老年代gc日志分析
+
+
+
+参数
+
+```bash
+-XX:NewSize=5242880 -XX:MaxNewSize=5242880 -XX:InitialHeapSize=10485760 -XX:MaxHeapSize=10485760 -XX:SurvivorRatio=8 -XX:PretenureSizeThreshold=3145728 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log
+```
+
+就更改了 -XX:PretenureSizeThreshold = 3145728     大于3MB的对象直接进入老年代。
+
+
+
+**情况一:** 
+
+年轻代存活对象太多，老年代放不下。触发CMS的Full gc。
+
+```java
+public static void main(String[] args) {
+    byte[] array1 = new byte[4*1024*1024];
+    array1 = null;
+    byte[] array2 = new byte[2 * 1024 * 1024];
+    byte[] array3 = new byte[2 * 1024 * 1024];
+    byte[] array4 = new byte[2 * 1024 * 1024];
+    byte[] array5 = new byte[128 * 1024];
+
+    byte[] array6 = new byte[2 * 1024 * 1024];
+}
+```
+
+
+
+内存模型如下
+
+<img src="JVM.assets/image-20210322145835142.png" alt="image-20210322145835142" style="zoom:50%;" />
+
+
+
+日志如下
+
+![image-20210322145930374](JVM.assets/image-20210322145930374.png)
+
+
+
+执行到 array6时无法分配，新生代没有足够空间。此时触发 young gc
+
+```log
+[ParNew (promotion failed): 7844K->8386K(9216K), 0.0048484 secs]
+```
+
+eden区原本有7000多kb对象，但是回收后发现一个都回收不掉，因为都被变量引用了。
+
+这时要把这些对象放入老年代了，但是老年代里还有一个4MB的垃圾对象，老年代空间也不够。
+
+此时触发 Full Gc。
+
+```log
+[CMS: 8194K->6651K(10240K), 0.0043053 secs] 11941K->6651K(19456K), [Metaspace: 3031K->3031K(1056768K)], 0.0094032 secs]
+```
+
+老年代的Old Gc 。    
+
+CMS: 8194K->6651K(10240K) 老年代的 8MB对象占用变成了6MB。为什么是8MB?
+
+是因为在young gc的时候先把 2个 2MB数组对象放入老年代。
+
+![image-20210322151009834](JVM.assets/image-20210322151009834.png)
+
+再接着放剩下的2MB数组对象和一个128KB的数组对象时，放不下了，这时才触发的 Full Gc。
+
+回收掉那 4MB的垃圾对象。接着再放入。
+
+![image-20210322151139044](JVM.assets/image-20210322151139044.png)
+
+最后年轻代已经空了，所以把 array6变量引用的 2MB数组对象放入 eden。
+
+```log
+eden space 8192K,  27% used
+```
+
+
+
+流程总结: 
+
+1.  4M的大对象直接进入老年代。
+2. 年轻代eden区域分配完3个2M对象和一个128Kb对象后，再分配第四个2M对象时，此时eden空间不足，分配失败。触发 young gc。此时 新生代存活对象 6M+128KB > 老年代可用连续空间 但是 老年代连续可用空间 > 历次进入老年代平均新生代平均大小，所以分配担保成功，不需要触发 Full gc。执行 young Gc。
+3. 执行 young gc ，但是 3个2MB和1个128KB都有引用，都存活，但是Survivor_from只有1MB空间，所以存活对象进入老年代。
+4. 先将2个存活的2MB对象和一个128KB对象放入老年代，当分配最后一个2MB对象时，老年代可用空间不够，触发Full Gc。 回收原先的4M垃圾对象。回收完后，将新生代存活着的2MB对象放入老年代。
+5. 新生代放入最开始想要分配的2MB对象。
+
+
+
+**情况二:**
+
+老年代可用空间 < 历次young gc 进入老年代对象的平均大小
+
+
+
+**情况三:** 老年代使用率达到了 92%的阈值。
 
 
 
@@ -1107,4 +1285,36 @@ public class Demo1 {
 
 
 
-下次分享 ：你说你精通jvm调优，能够说下G1工作原理以及整体流程吗？
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
