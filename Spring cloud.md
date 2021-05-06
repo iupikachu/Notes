@@ -1,4 +1,4 @@
-## Spring cloud
+## 微服务架构
 
 
 
@@ -265,6 +265,18 @@ service network restart
 
 
 
+配置 hosts
+
+```bash
+vi /etc/hosts
+```
+
+
+
+![image-20210422100324910](Spring cloud.assets/image-20210422100324910.png)
+
+
+
 #### 2.3关闭防火墙
 
 ```bash
@@ -345,6 +357,30 @@ cp id_rsa.pub authorized_keys
 
 
 #### 2.6 配置 nacos
+
+
+
+重命名cluster.conf.example，去掉example，配置三台机器的地址和端口号，默认端口号是8848，使用默认的derby数据库就行了，但是生产环境下，可以部署一个MySQL数据库，执行nacos-mysql.sql初始化数据库里的表之类的东西，然后分别修改他们的application.properties文件，里面修改数据库配置
+
+ 
+
+spring.datasource.platform=mysql
+
+db.num=1
+
+db.url.0=xxx
+
+db.user=xx
+
+db.password=xxx
+
+ 
+
+分别进入三台机器的bin目录，执行startup.sh，检查logs目录下的start.out启动日志，如果启动成功就可以了，访问任何一个节点的8848端口的/nacos地址，进入nacos控制台，可以看到nacos集群的具体情况
+
+
+
+
 
 ```bash
 Last login: Mon Mar 29 15:39:00 2021 from hadoop01
@@ -1322,4 +1358,606 @@ BASE希望的是，CAP里面基本都可以同时实现，但是不要求同时�
 
 
 > CAP 和 BASE 是俩基础理论。在设计分布式系统的话，可以用CAP中的CP或者AP，也可以采用BASE理论，有一些不一样，也有一些关系。
+
+
+
+
+
+
+
+#### 6.7  Seata分布式事务实现思路
+
+34课
+
+**不跟钱相关的没必要使用分布式事务,一些权益相关的可以用一下可靠消息最终一致性（支付业务、金融、银行）**
+
+核心组件
+
+* TC 事务协调器  （Seata自己独立部署的server，用于全面管理每个分布式事务）
+* TM 事务管理者   (对单个分布式事务进行管理和注册)
+* RM 资源管理者   (对一个分布式事务内的每个服务本地分支事务进行管理)
+
+<img src="Spring cloud.assets/image-20210416193614546.png" alt="image-20210416193614546" style="zoom:50%;" />
+
+
+
+
+
+<img src="Spring cloud.assets/image-20210426150457642.png" alt="image-20210426150457642" style="zoom:67%;" />
+
+原理: 
+
+​	TM完全可以基于一个注解驱动，Spring AOP机制。拦截方法。@XXXXTransaction 加在服务Service组件上。对这个组件的方法调用做拦截。如果你发现这个方法加了你指定的分布式事务的注解。提取一下本次请求里带的一些请求头或者是请求附加的内置参数，有没有一个全局事务id，xid，这个带着 @XXXXShishanTransaction注解的方法，他其实是一个分布式事务的起始方法，TM这样的一个组件的业务逻辑就可以开始运作起来了。
+
+​	引入依赖，还会在spring boot配置文件里配置一下分布式事务的一些配置，分布式事务server端的地址，暴露出来的都是RESTful API接口，基于HTTP请求就可以了。
+
+​	TM如果要找TC注册一个全局事务，此时就可以通过HTTP通信组件，发送HTTP请求到指定地址的TC server的接口就可以了，TC server可以注册一个全局事务，生成一个唯一的txid，返回给你的TM。
+
+**RM如何可以拦截你的本地数据库的操作呢？**
+
+​	代理你的数据源，操作数据库，必须要有一个数据库连接，JDBC接口规范里就是一个Connection对象，数据库连接池，Druid、C3P0、DBCP，维护一个数据库连接池，一定会从数据库连接池里获取一个数据库连接依托这个数据库连接去对数据库执行增删改的操作
+
+ 	你可以针对你的数据库连接去做一个代理，也就是说，业务系统拿到的数据库连接是被你代理过的，他基于你的代理数据库连接执行增删改操作，代码会先执行到你手上，此时你就可以做一些操作了
+
+​	增删改的语句，执行一些查询，DELETE语句，UPDATE，生成一个逆向的UPDATE语句，想要把一个字段改成1100，900，生成一个INSERT语句
+
+​	在一个本地事务里，让他执行增删改，把你生成的undo log插入到数据库的undo_log表里去，发送HTTP请求到TC去注册一个分支事务，提交本地事务，把增删改操作和undo log插入都放一个本地事务里，他们会一起成功或者失败。
+
+
+
+![image-20210416193850034](Spring cloud.assets/image-20210416193850034.png)
+
+
+
+
+
+
+
+#### 6.8 部署seata
+
+
+
+registry.conf是什么，就是seata server可以集成注册中心，可以让你seata server注册到比如nacos去，作为一个服务，然后你各个服务就不用手动配置seata server地址了，直接发现就可以了，不过不用这个手动配置其实也行。
+
+
+
+把 seata放到 /usr/local/下 修改一下 vi seata-server.sh 把启动jvm参数根据需求调一下。
+
+
+
+```bash
+[root@hadoop01 bin]# jps
+2406 Jps
+2155 nacos-server.jar
+[root@hadoop01 bin]# nohup sh seata-server.sh -p 8091 -h 192.168.1.128 -m file > /dev/null 2>&1 &
+[1] 2417
+[root@hadoop01 bin]# jps
+2417 Server
+2155 nacos-server.jar
+2443 Jps
+
+```
+
+
+
+
+
+面试亮点可以加一下分布式事务
+
+
+
+### 7.服务雪崩
+
+<img src="Spring cloud.assets/image-20210426182703091.png" alt="image-20210426182703091" style="zoom:50%;" />
+
+雪崩、隔离、熔断、限流、降级
+
+
+
+* 服务雪崩:  一个服务挂了之后，请求还在继续，导致请求阻塞，不断消耗线程资源，最后无法处理所有请求，导致大面积的服务无法工作。
+* 隔离:  隔离出(比如20个) 线程专门服务某一个服务，如果这个服务(评审员)挂掉了，那么这20个线程就阻塞了。阻塞了之后就要熔断了。
+* 熔断:  假设举报服务有200个线程，在短时间内这200个线程都不会去找这20个线程，直接认为评审员服务以及挂了。假设还有请求，但是熔断开关开启，直接给这个请求返回异常。
+* 降级:  假设评审员服务已经挂了，已经触发熔断了，这时还有提交举报服务的请求，这时候把这个请求储存在本地磁盘中，返回提交举报成功，等评审员服务恢复后，再取出这些请求去找那20个请求执行。
+* 限流:  假设举报服务一秒钟可以承受200个请求，但是底下的评审员服务最多承受100个请求，这时限流1秒内最多提交举报请求100个。
+
+
+
+**技术选型对比**
+
+Spring Cloud Netflix, Hystrix这个项目，功能层面很好用，但是源码特别烂，运用了奇怪的代码方式。
+
+
+
+Spring Cloud Alibaba , Sentinel
+
+
+
+#### **7.1 Sentinel** 
+
+
+
+官方文档: https://github.com/alibaba/Sentinel/wiki
+
+
+
+
+
+
+
+
+
+
+
+>Sentinel 和 Hystrix 原则是一样的，当检测到调用链路中某个资源出现不稳定的表现，例如请求响应时间长或者异常比例升高的时候，则对这个资源的调用进行限制，让请求快速失败，避免影响到请他的资源而导致级联故障。
+
+熔断降级:
+
+在限制的手段上， Sentinel 和 Hystrix 采取了完全不一样的方法。
+
+Hystrix 通过线程池隔离对资源进行隔离。好处是资源和资源之间做到了最彻底的隔离。缺点是增加了线程切换的成本，(过多的线程池导致了线程数目过多)，还需要预先给各个资源做线程池大小的分配。
+
+
+
+Sentinel  (1.8.0以前的熔断策略)
+
+* 并发线程数进行限制
+
+  Sentinel通过限制资源并发线程的数量，来减少不稳定资源对其他资源的影响。不但没有切换线程的消耗，也不需要预先分配线程池的大小。某个资源出现不稳定，会造成线程数的堆积，超过一定数量之后，对该资源的新请求就会拒绝。
+
+* 通过响应时间对资源进行降级
+
+  Sentinel通过响应时间来快速降级不稳定的资源。当依赖的资源出现响应时间过长。所有对该资源的访问都会拒绝，直到过了指定的时间窗口后才重新恢复。
+
+  
+
+**1.8.0 版本对熔断降级特性进行了全新的改进升级**
+
+Sentinel 提供以下几种熔断策略 ：
+
+- 慢调用比例 (`SLOW_REQUEST_RATIO`)：选择以慢调用比例作为阈值，需要设置允许的慢调用 RT（即最大的响应时间），请求的响应时间大于该值则统计为慢调用。当单位统计时长（`statIntervalMs`）内请求数目大于设置的最小请求数目，并且慢调用的比例大于阈值，则接下来的熔断时长内请求会自动被熔断。经过熔断时长后熔断器会进入探测恢复状态（HALF-OPEN 状态），若接下来的一个请求响应时间小于设置的慢调用 RT 则结束熔断，若大于设置的慢调用 RT 则会再次被熔断。
+- 异常比例 (`ERROR_RATIO`)：当单位统计时长（`statIntervalMs`）内请求数目大于设置的最小请求数目，并且异常的比例大于阈值，则接下来的熔断时长内请求会自动被熔断。经过熔断时长后熔断器会进入探测恢复状态（HALF-OPEN 状态），若接下来的一个请求成功完成（没有错误）则结束熔断，否则会再次被熔断。异常比率的阈值范围是 `[0.0, 1.0]`，代表 0% - 100%。
+- 异常数 (`ERROR_COUNT`)：当单位统计时长内的异常数目超过阈值之后会自动进行熔断。经过熔断时长后熔断器会进入探测恢复状态（HALF-OPEN 状态），若接下来的一个请求成功完成（没有错误）则结束熔断，否则会再次被熔断。
+
+
+
+### 8.配置中心
+
+
+
+spring cloud netflix 跟 spring cloud alibaba
+
+ 
+
+服务注册中心，就很多种技术选型；分布式事务，也是很多种框架；sentinel和hystrix，能干的事情类似；配置中心领域，携程开源了一款apollo，spring cloud config，nacos本身是一个服务注册中心但是也带了配置中心的功能
+
+apollo，架构是比较复杂，比较完善的，功能上也很完善，活跃，并不一定中小型公司去使用apollo，spring cloud alibaba，nacos，nacos作为一个服务注册中心本身就包含了配置中心的功能，没必要花很多时间再去部署一套apollo
+
+spring cloud config，如果你用的不是spring cloud alibaba，用的是spring cloud netflix，那么你可以配合那个技术栈，直接用spring cloud提供的config项目作为配置中心就可以了，因为这是属于spring cloud原生技术栈里提供的
+
+ 
+
+ 
+
+nacos完全可以满足很多中小型公司的配置中心的需求，哪怕是大公司也可以用的，apollo确实用的公司很多，中大型公司都会去用apollo，而且他的功能很完善的。
+
+
+
+官网链接: https://github.com/ctripcorp/apollo
+
+
+
+
+
+![image-20210427151622651](Spring cloud.assets/image-20210427151622651.png)
+
+
+
+原理
+
+
+
+* ConfigService 服务于客户端
+* AdminService 对配置进行管理(crud)
+* ConfigService 和 AdminService往Eureka进行注册
+* MetaService 通过服务发现拿到部署的 机器ip 端口号 供客户端调用
+* Portal提供界面对配置进行修改
+
+
+
+
+
+### 9.监控中心
+
+
+
+线上系统，可能产生的三个层面的问题：
+
+ 
+
+1、 机器资源的层面：cpu、内存、网络、磁盘、io，出现了负载过高的问题
+
+2、 JVM进程的层面：jvm内部各个区域的内存使用以及gc频率
+
+3、 代码层面：代码逻辑的内部，抛异常，出现一些不希望发生的系统异常
+
+但凡是线上的系统，配置中心、分布式事务、sentinel dashboard都可以不用，主要把服务注册中心和rpc框架搞好，一套服务之间RPC调用组成的一套系统能上线就可以了，可以跑起来了，但是监控中心是必须要有的
+
+
+
+**Zabbix、Falcon、Prometheus的选型对比**
+
+2015~2016年左右以及之前，国内比较多的用的是Zabbix这个国外开源的监控系统，直接部署做一些配置，就可以让他去监控你的各个服务器以及部署的服务实例了；Falcon，做的还是比较好的；2018~2019再往后推，基本上跟着微服务体系，一般监控中心国外和国内，最火的，用的比较多的就是Prometheus
+
+
+
+#### 9.1 Prometheus 架构设计以及原理介绍
+
+
+
+<img src="Spring cloud.assets/image-20210427161608043.png" alt="image-20210427161608043" style="zoom:50%;" />
+
+
+
+在你要监控的服务器上部署exporters，比如node_exporter就是基于linux内核写的，专门收集机器的cpu、内存、网络、io、磁盘的资源使用情况，然后prometheus server就可以从exporters拉取metrics过来存储和展示，以及进行报警
+
+ 
+
+除此之外，对什么mysql，redis之类的中间件，都有对应的exporter，你自己也可以写exporter，按照他的标准写就行了
+
+ 
+
+还有一种，就是有一个pushgateway，可以让你直接推送metrics给他，比如你系统的一些业务指标监控，就可以走这种方式
+
+ 
+
+然后prometheus server可以把拉取到的metrics存储到本地磁盘去，基于TSDB进行时序数据的存储，也会自动的清理旧数据，保留最新数据，TSDB是时间序列数据库，尤为适合这种监控指标的存储，按时间来存储
+
+ 
+
+定时查询配置好的报警规则，如果发现metric满足规则，就把alert发送到alertmanager去，此时会通过钉钉了、email了、短信之类的方式去对你进行告警
+
+ 
+
+如果要能够可视化的查看metric监控报表，一般是基于Grafana可视化系统来进行的，Grafana天然支持对接prometheus，专门是做指标可视化的，很方便使用，需要独立进行部署，不然他自己也有Prometheus Web UI，可以基于他的PromQL查询语句去查询
+
+
+
+
+
+#### 9.2 部署
+
+具体部署不用演示了，因为比较简单，给一下步骤就行
+
+ 
+
+上prometheus官网下载
+
+ 
+
+prometheus-2.4.0.linux-amd64.tar.gz
+
+```bash
+
+
+tar -zxvf prometheus-2.4.0.linux-amd64.tar.gz -C /data
+
+cd /data
+
+chown -R root:root prometheus-2.4.0.linux-amd64
+
+ln -sv prometheus-2.4.0.linux-amd64 prometheus     # 软链
+
+ 
+
+cd /data/prometheus
+
+./prometheus
+```
+
+ 
+
+ 
+
+直接访问本机的9090端口号，就能看到prometheus的web ui
+
+ 
+
+接着就是对要监控的机器去部署node exporter，是基于go语言写的，可以拿到cpu、内存、磁盘空间、磁盘io、网络带宽、系统负载、主板温度等一系列的机器资源监控指标，这个是最基本要做的监控
+
+ 
+
+在https://prometheus.io/download/里面找到node exporter的下载地址，下载一个最新的版本，接着进行解压缩，直接./node_exporter运行起来，就O了，默认的监听端口是9100，然后再把这个node exporter跟prometheus集成起来
+
+ 
+
+编辑prometheus的配置文件，有一个prometheus.yml，里面需要加入job去跟node_exporter进行集成
+
+
+
+```bash
+scrape_configs:
+
+\-    job_name: ‘prometheus’
+
+static_configs:
+
+-targets: [‘192.168.xx.xx:9090’]
+
+ \- job_name: ‘xx_node_exporter’
+
+   static_configs:
+
+   -targets: [‘192.168.xx.xx:9100’]
+```
+
+ 
+
+重启prometheus server就可以了，直接进入web ui就可以在targets里找到你要监控的机器，然后里面各项资源监控报表都可以看到了
+
+
+
+让spring boot业务系统接入prometheus也很简单，首先是加入一些依赖
+
+ 
+
+就是io.prometheus.simpleclient相关的一些依赖，这个其实大家可以自行搜索，网上很多文章讲这个，我们就是说思路，然后在Application类上加入@EnablePrometheusEndpoint注解就可以了
+
+ 
+
+此时你访问http://localhost:8080/prometheus，就可以看到jvm的监控指标了
+
+ 
+
+如果还要接入自定义的指标，需要加入一个拦截器，然后代码里用prometheus client提供的Counter类去进行指标计数就可以了，除此之外，还有gauge、Histogram之类的指标收集API，都可以用来统计业务指标，然后就跟之前一样，接入prometheus即可
+
+ 
+
+业务指标：需要采集三个，**异常指标，QPS，接口时延**，TP99，TP95，TP90
+
+ **QPS（Query Per Second）：每秒请求数，就是说服务器在一秒的时间内处理了多少个请求。**
+
+实现思路: Spring Aop 对某个方法切面
+
+
+
+其实说实话，这些操作步骤，搜索就是很多，所以不带着大家做了，但是希望大家脑子里应该有这么个思路
+
+
+
+### 10.日志中心
+
+
+
+**为什么需要一个日志中心?**
+
+
+
+线上运行的系统，跑着跑着，突然有用户找客服反馈你的系统有个什么什么bug！bug可能有对应的异常报错，也可能没有报错，就是纯粹的是你的代码级别的bug，客服会找你们技术这边
+
+ 
+
+快速的定位bug发生的原因，定位 -> 修复
+
+ 
+
+通过查阅日志，分析bug发生时，系统是如何运行的，是否运行中有问题导致bug
+
+如果你单个服务/系统部署的机器数量都超过5台了，此时必须要上日志中心。
+
+
+
+#### **ElasticSearch（日志中心）**
+
+<img src="Spring cloud.assets/image-20210428134705467.png" alt="image-20210428134705467" style="zoom:50%;" />
+
+《互联网Java工程师面试突击第一季》，儒猿技术窝，免费，不要钱，ES的架构原理，我都讲过，大家直接去看一下，倒排索引，正排索引，shard数据分片，replica副本，写入原理，分布式搜索原理 
+
+业务、项目、服务、时间戳（long）、不同的日志有自己的特殊的业务id（用户id、举报渠道）、日志内容（举报的具体内容数据，json字符串来存储）
+
+日志中心没有开源的，可能有少数的不知名的，但是连我都没听说过 
+
+一般都是公司自己基于ES来做研发的，ES+HBase，黄金组合，HBase适合的是海量数据进行存储，ES，内置生成ES的document id，id作为rowkey把日志内容放到HBase里去，程序员，可以根据业务、项目、服务、时间戳（long）、不同的日志有自己的特殊的业务id（用户id、举报渠道）来搜索日志。
+
+
+
+如何打log
+
+```java
+    /**
+     * @param reportTask 举报任务
+     * @return
+     */
+    @GetMapping("/report")
+    public String report(ReportTask reportTask) {
+        List<Long> reviewerIds = null;
+        System.out.println("进入report");
+        // 本地数据库增加一个举报任务
+        // 打印日志
+        // LOGGER.info(BUSSINES_NAME,PROJECT_NAME,SERVICE_NAME,reportUserId,channelType,"接收到用户提交的举报任务:"+reportContent)
+        reportTaskService.add(reportTask);
+        // LOGGER.info(BUSSINES_NAME,PROJECT_NAME,SERVICE_NAME,reportUserId,channelType,"已经将用户的举报任务存储到本地数据库:"+reportContent)
+
+        System.out.println("结束add");
+
+        Entry entry = null;
+        try {
+            entry = SphU.entry("ReviewerServiceResource");
+            /*
+            您的逻辑
+             */
+            // 调用评审员服务,选择一批评审员
+             reviewerIds = reviewerService.selectReviewers(reportTask.getId());
+            // LOGGER.info(BUSSINES_NAME,PROJECT_NAME,SERVICE_NAME,reportUserId,channelType,"对举报任务:" + reportTask +",完成审核人员的分配:"+reviewerIds)
+        }catch (BlockException e1){
+            System.out.println("系统熔断或者限流，无法正常运行......");
+            return "fail";
+        }catch (Exception e){
+            // LOGGER.error(BUSSINES_NAME,PROJECT_NAME,SERVICE_NAME,reportUserId,channelType,"对举报任务:" + reportTask +",分配评审员失败，远程评审员服务调用异常:"+ e1)
+            System.out.println("系统出现异常，无法正常运行......");
+            // 在这里做一个逆向补偿，如果一旦发生评审员分配失败，则把之前保存的局部任务给删除就可以了
+            return "fail";
+        }
+        finally {
+            if(entry != null){
+                entry.exit();
+            }
+        }
+
+        if(reviewerIds != null){
+            // 在本地数据库初始化这批评审员对举报任务的投票状态
+            reportTaskVoteService.initVotes(reviewerIds, reportTask.getId());
+            // LOGGER.info(BUSSINES_NAME,PROJECT_NAME,SERVICE_NAME,reportUserId,channelType,"对举报任务:" + reportTask +",完成审核人员投票状态的初始化:"+reviewerIds)
+        }
+
+        //模拟发送 push 消息给评审员
+        System.out.println("模拟发送 push 消息给评审员......");
+
+        return "success";
+    }
+
+```
+
+
+
+
+
+
+
+dao  service 层有异常就往外抛， controller层负责接收异常，controller控制业务的流转。
+
+
+
+
+
+### 11.链路追踪
+
+ 
+
+日志：异常日志、请求日志
+
+ 
+
+链路
+
+ 
+
+请求链路
+
+请求1次数据库  耗时多少ms
+
+请求1次缓存    耗时多少ms
+
+请求2次评审员服务 耗时多少ms
+
+请求1次奖励服务    异常    耗时1s
+
+
+
+CAT 大众点评开源
+
+
+
+
+
+### 12.网关
+
+
+
+网关的核心功能
+
+（1）动态路由：新开发某个服务，动态把请求路径和服务的映射关系热加载到网关里去；服务增减机器，网关自动热感知
+
+（2）灰度发布
+
+（3）授权认证
+
+（4）性能监控：每个API接口的耗时、成功率、QPS
+
+（5）系统日志
+
+（6）数据缓存
+
+（7）限流熔断
+
+
+
+几种技术选型
+
+Kong     Zuul    Nginx+Lua   自研网关
+
+**Kong**: Nginx里面基于lua写的模块。实现网关的功能
+
+**Zuul** :  Spring Cloud 来玩儿微服务的技术架构 
+
+**Nginx+Lua（OpenResty）**：亿级流量系统架构的课程，详细讲解了 Nginx+Lua 的开发
+
+**自研网关**：自己来写类似 Zuul 的网关，基于Servlet Netty 来做网关，实现上述功能。
+
+
+
+大厂:BAT 京东 美团 都是基于netty等技术自研网关
+
+中小型公司: Spring Cloud 技术栈主要是 Zuul ; Dubbo技术栈，有的采用Kong等网关 ，也可以直接不用网关，很多公司直接nginx直接反向代理+负载均衡；
+
+Zuul: 基于java开发，核心网关功能都比较简单，但是比如灰度发布、限流、动态路由之类的都要自己二次开发。
+
+​        高并发能力不强，部署到一些机器上去，还要基于tomcat来部署，springboot 用tomcat把网关系统跑起来；java语言开发，可以直接把控源码，可以做二次开发。
+
+
+
+Nginx（Kong、Nginx+Lua） Nginx抗高并发的能力很强，少数几台机器部署一下，就可以很高的并发。但是精通Nginx的源码很难，c语言，很难从Nginx内核层面做一些二次开发和源码定制。
+
+
+
+
+
+**Zuul 原理**
+
+<img src="Spring cloud.assets/image-20210429100123822.png" alt="image-20210429100123822" style="zoom:80%;" />
+
+
+
+设计模式，其实在各种开源项目里，到处都是设计模式
+
+ 
+
+**pre过滤器**
+
+ 
+
+-3：ServletDetectionFilter
+
+-2：Servlet30WrapperFilter
+
+-1：FromBodyWrapperFilter
+
+1：DebugFilter
+
+5：PreDecorationFilter
+
+ 
+
+**routing过滤器**
+
+ 
+
+10：RibbonRoutingFilter
+
+100：SimpleHostRoutingFilter
+
+500：SendForwardFilter
+
+ 
+
+post过滤器 
+
+1000：SendResponseFilter 
+
+**error过滤器** 
+
+0：SendErrorFilter
+
+
+
+zuul的源码，其实非常简单的，一点都不复杂，zuul的源码，有可能是spring cloud几个核心组件里面，最简单的，ribbon差不多一个级别的简单
 

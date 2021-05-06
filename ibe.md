@@ -1,3 +1,5 @@
+
+
 ## ibe
 
 ### 对称加密算法
@@ -404,6 +406,10 @@ SM2算法是我国基于ECC椭圆曲线密码理论自主研发设计，由国�
 
 
 
+其中SM1、SM7算法不公开，调用该算法时，需要通过加密芯片的接口进行调用；比较少人了解这些算法，在这里对这些国密算法做简单的科普
+
+
+
 **1 SM1对称密码**
  SM1 算法是分组密码算法，分组长度为128位，密钥长度都为 128 比特，算法安全保密强度及相关软硬件实现性能与 AES 相当，算法不公开，仅以IP核的形式存在于芯片中。
  采用该算法已经研制了系列芯片、智能IC卡、智能密码钥匙、加密卡、加密机等安全产品，广泛应用于电子政务、电子商务及国民经济的各个应用领域（包括国家政务通、警务通等重要领域）。
@@ -441,7 +447,93 @@ SM9算法不需要申请数字证书，适用于互联网应用的各种新兴�
 
 #### Sm9 算法
 
+IBC（基于标识的密码系统，Identity-Based Cryptograph）是在基于传统的PKI基础上发展而来，主要简化在具体安全应用在大量数字证书的交换问题，使安全应用更加易于部署和使用。
+　　IBC密码技术使用的是非对称密码体系，加密与解密使用两套不同的密钥，每个人的公钥就是他的身份标识，比如email地址，电话号码等。而私钥则以数据的形式由用户自己掌握，密钥管理相当简单，可以很方便的对数据信息进行加解密。
+IBC的基础技术包括数据加密、数字签名、数据完整性机制、数字信封，用户识别，用户认证等。
 
+
+SM9标识密码算法是由国密局发布的一种IBE(Identity-Based Encryption)算法。IBE算法以用户的身份标识作为公钥，不依赖于数字证书。国密SM9算法标准包括5个文档，分别为：
+《GMT 0044-2016 SM9标识密码算法：第1部分 总则》
+《GMT 0044-2016 SM9标识密码算法：第2部分 数字签名算法》
+《GMT 0044-2016 SM9标识密码算法：第3部分 密钥交换协议》
+《GMT 0044-2016 SM9标识密码算法：第4部分 密钥封装机制和公钥加密算法》
+《GMT 0044-2016 SM9标识密码算法：第5部分 参数定义》
+
+曲线参数
+SM9是基于256位的BN椭圆曲线的，使用素域 Fp 和有限域 Fp2 ，双线性对使用R-ate。曲线参数主要包括：
+
+椭圆曲线方程：y2=x3+b 
+方程参数b：05
+参数t：
+60000000 0058F98A
+基域特征q：
+B6400000 02A3A6F1 D603AB4F F58EC745 21F2934B 1A7AEEDB E56F9B27 E351457D
+群的阶N
+B6400000 02A3A6F1 D603AB4F F58EC744 49F2934B 18EA8BEE E56EE19C D69ECF25
+余因子cf：1
+群1 的生成元P1 = (xp1 , yp1)：
+坐标xp1：
+93DE051D 62BF718F F5ED0704 487D01D6 E1E40869 09DC3280 E8C4E481 7C66DDDD
+坐标yp1：
+21FE8DDA 4F21E607 63106512 5C395BBC 1C1C00CB FA602435 0C464CD7 0A3EA616
+群2 的生成元P2 = (xp2, yp2)：
+坐标xp2：
+(85AEF3D0 78640C98 597B6027 B441A01F F1DD2C19 0F5E93C4 54806C11 D8806141 ,
+37227552 92130B08 D2AAB97F D34EC120 EE265948 D19C17AB F9B7213B AF82D65B )
+坐标yp2：
+(17509B09 2E845C12 66BA0D26 2CBEE6ED 0736A96F A347C8BD 856DC76B 84EBEB96 ,
+A7CF28D5 19BE3DA6 5F317015 3D278FF2 47EFBA98 A71A0811 6215BBA5 C999A7C7 )
+
+ 
+
+SM9算法主要包括密钥部分和算法部分。
+
+密钥部分：包括主密钥对(公钥和私钥)和用户私钥
+算法部分：包括签名验签算法、密钥封装解封算法、加密解密算法和密钥交换算法
+
+
+密钥部分
+SM9算法的密钥由KGC(密钥生成中心)产生，主要包括KGC的主密钥对和用户的私钥。
+主密钥对分为签名主密钥对和加密主密钥对。
+
+签名主密钥对：其私钥是一个在[1,N-1]范围内的随机数；公钥是G2群的基点P2的倍点，倍数为私钥。
+加密主密钥对：其私钥是一个在[1,N-1]范围内的随机数；公钥是G1群的基点P1的倍点，倍数为私钥。
+
+
+主密钥对的公私钥用在不同场景，其中主私钥仅用于计算用户私钥；主公钥则由KGC公开并用在其他部分。同时，签名主公钥仅用于签名和验签算法；加密主公钥则用于密钥封装、加密和密钥交换中。
+
+用户私钥由KGC产生，包括签名私钥和加密私钥。
+
+签名私钥：是G1群的基点P1的倍点。签名私钥仅用于签名中
+加密私钥：是G2群的基点P2的倍点。加密私钥用于密钥解封、解密和密钥交换中
+KGC使用主私钥和用户身份标识(以下简称ID)生成用户的私钥。
+
+算法部分
+SM9算法包括签名验签、密钥封装解封、加密解密和密钥交换四大部分。
+
+签名算法：使用签名主公钥和签名者的签名私钥给数据签名
+验签算法：使用签名主公钥和签名者ID验证签名
+密钥封装算法：使用加密主公钥和密钥解封者(使用对称密钥的另一方)ID封装一个对称密钥
+密钥解封算法：使用加密主公钥和密钥解封者ID解出封装了的对称密钥
+加密算法：使用加密主公钥和解密者ID加密数据
+解密算法：使用解密者的加密私钥和解密者ID解密数据
+密钥交换算法：密钥交换双方使用加密主公钥、自己的加密私钥和双方的ID协商出一个共享密钥
+
+
+用户身份标识符：ID
+SM9算法中的用户身份标识ID主要用于用于私钥生成、验签、密钥封装解封、加密解密封和密钥交换。
+
+主要应用的ID简单描叙如下：
+
+私钥生成：ID是私钥属主的ID
+验签：ID是签名者的ID
+密钥封装解封：ID是解封者的ID
+加密解密：ID是解密者的ID
+密钥交换：发起方和响应方都需要自己的ID和对方的ID
+
+————————————————
+版权声明：本文为CSDN博主「拥抱不确定」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/SkyChaserYu/article/details/88051354
 
 ##### 秘钥交换
 
@@ -725,4 +817,198 @@ A用B的公钥将自己的私钥加密生成重加密密钥Kab并将其上传云
 B向云端申请密文Kab，C3，C1；
 
 B将C3解密得到对称密钥，用密钥解密C1得到明文
+
+
+
+
+
+
+
+### SM-Util-starter
+
+
+
+![image-20210422140004206](ibe.assets/image-20210422140004206.png)
+
+
+
+ ECB模式只进行了加密，而CBC模式则在加密之前进行了一次XOR。
+
+
+
+
+
+## 使用说明
+
+
+
+**maven 依赖**
+
+```java
+<!--引入jpbc依赖-->
+<dependencies> 
+<dependency>
+    <groupId>it.unisa.dia.gas</groupId>
+    <artifactId>jpbc-api</artifactId>
+    <version>2.0.0</version>
+</dependency>
+<dependency>
+    <groupId>it.unisa.dia.gas</groupId>
+    <artifactId>jpbc-plaf</artifactId>
+    <version>2.0.0</version>
+</dependency>
+</dependencies> 
+  
+  
+ <dependency>
+            <groupId>com.github.iupikachu</groupId>
+            <artifactId>SM9-Start-Util</artifactId>
+            <version>0.0.1</version>
+ </dependency>
+  
+  
+ <repositories>
+        <repository>
+            <id>lambdaupb.jpbc.fake</id>
+            <name>UNMAINTAINED jPBC maven repository</name>
+            <url>https://raw.github.com/lambdaupb/maven-jpbc/master/</url>
+        </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://www.jitpack.io</url>
+        </repository>
+ </repositories>
+```
+
+### SM2椭圆曲线公钥密码算法
+
+```java
+// 加密
+String encrypt(String plainText) throws IOException;
+
+// 解密
+String decrypt(String cipherText) throws IOException;
+
+// 签名
+SM2SignVO sign(String message);
+
+// 验签
+Boolean verify(String message ,SM2SignVO sign);
+```
+
+
+
+```java
+@Autowired
+SM2Service sm2Service;
+
+@Test
+public void testSM2Service() throws IOException {
+  
+    String s = "acising";
+    String cipherText = sm2Service.encrypt(s);
+    String plainText = sm2Service.decrypt(cipherText);
+    System.out.println(plainText);
+    SM2SignVO sign = sm2Service.sign(s);
+    Boolean verify = sm2Service.verify(s, sign);
+    System.out.println("验签是否成功:"+verify);
+}
+```
+
+
+
+
+
+### SM3杂凑算法
+
+
+
+```java
+// 获得64位杂凑值
+String getHash(String message);
+```
+
+
+
+```java
+@Autowired
+SM3Service sm3Service;
+
+@Test
+public void testSM3(){
+    String s = sm3Service.getHash("acising");
+    System.out.println(s);
+}
+```
+
+
+
+### SM4对称算法
+
+```java
+// encrypt ECB加密
+String encrypt_ECB(String message);
+
+// decrypt ECB解密
+String decrypt_ECB(String cipherText);
+
+// encrypt CBC加密
+String encrypt_CBC(String message);
+
+// decrypt CBC解密
+String decrypt_CBC(String cipherText);
+```
+
+
+
+```java
+@Autowired
+SM4Service sm4Service;
+
+@Test
+public void testSM4(){
+    String message = "acising";
+    String s1 = sm4Service.encrypt_ECB(message);
+    System.out.println("ECB加密:"+s1);
+    String s2 = sm4Service.decrypt_ECB(s1);
+    System.out.println("ECB解密:"+s2);
+    String s3 = sm4Service.encrypt_CBC(message);
+    System.out.println("CBC加密:"+s3);
+    String s4 = sm4Service.decrypt_CBC(s3);
+    System.out.println("CBC解密:"+s4);
+}
+```
+
+
+
+
+
+### SM9标识密码算法
+
+```java
+// 加密服务
+ResultCipherText encrypt(String IBE_Identify,String msg) throws Exception;
+
+// 解密服务
+String decrypt(String IBE_Identify,ResultCipherText resultCipherText) throws Exception;
+
+// 注册
+Map<String, Object> register(String IBE_Identify) throws Exception;
+```
+
+
+
+```java
+@Autowired
+SM9Service sm9Service;
+
+@Test
+public void testSM9(){
+String id = "Bob";
+String msg ="acising";
+ResultCipherText resultCipherText = sm9Service.encrypt(id,msg);
+String s1 = sm9Service.decrypt(id, resultCipherText);
+System.out.println("s1:"+s1);
+}
+```
 
