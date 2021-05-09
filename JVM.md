@@ -1776,7 +1776,7 @@ select * from tbl。
 
 
 
-#### 9.3 内存泄露
+#### 9.3 内存泄露  （mat使用）
 
 
 
@@ -1832,6 +1832,29 @@ jmap -dump:format=b,file=文件名[服务进程id]
 
 
 MAT下载地址：https://www.eclipse.org/mat/downloads.php
+
+tips：如果报 failer create java virtual machine
+
+解决方法:
+
+1. vi /Applications/mat.app/Contents/Eclipse/MemoryAnalyzer.ini
+
+2. 增加
+
+   ```bash
+   -vm
+   /Library/Java/JavaVirtualMachines/jdk1.8.0_281.jdk/Contents/Home/bin
+   ```
+
+<img src="JVM.assets/image-20210509151054341.png" alt="image-20210509151054341" style="zoom:50%;" />
+
+3. 执行 MemoryAnalyzer 脚本
+
+   <img src="JVM.assets/image-20210509151224402.png" alt="image-20210509151224402" style="zoom:50%;" />
+
+4. 再启动mat就可以了
+
+   
 
 下载后，安装目录里有一个文件名字: MemoryAnalyzer.ini
 
@@ -1906,4 +1929,163 @@ jdk1.7 则给每一个切分出来的字符串都创建一个新的数组。
 * MetaSpace
 * java虚拟机栈
 * 堆内存
+
+
+
+#### 10.1 MetaSpace 内存溢出
+
+
+
+
+
+metaSpace里的类回收的条件相当的苛刻: 比如这个类的类加载器先要被回收，比如这个类的所有对象实例都要被回收,等等。
+
+
+
+**发生MetaSpace 内存溢出的条件:**
+
+* 上线系统的时候对 Metaspace使用默认的参数，根本不设置大小
+* 很多人写代码的时候会用cglib之类的技术动态生成一些类，一旦代码中没有控制好，导致你生成的类过多，就容易把MetaSpace塞满。
+
+
+
+解决方法:
+
+* -XX: MetaspaceSize = 512m
+
+  -XX: MaxMetaspaceSize = 512m
+
+  设置一下大小，默认只有几十MB
+
+  
+
+
+
+
+
+**模拟MetaSpace内存溢出**
+
+<img src="JVM.assets/image-20210509104415998.png" alt="image-20210509104415998" style="zoom:67%;" />
+
+
+
+设置jvm参数
+
+-XX:MetaspaceSize=10m
+-XX:MaxMetaspaceSize=10m
+
+```java
+public class Demo1 {
+
+    public static void main(String[] args) {
+        int counter = 0;
+        while(true){
+            Enhancer enhancer = new Enhancer();
+            enhancer.setSuperclass(Car.class);
+            enhancer.setUseCache(false);
+            enhancer.setCallback(new MethodInterceptor() {
+                @Override
+                public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+
+                    if(method.getName().equals("run")){
+                        System.out.println("启动汽车之前，先进行自动的安全检查.......");
+                        return methodProxy.invokeSuper(o,objects);
+                    }else{;
+                        return methodProxy.invokeSuper(o,objects);
+                    }
+                }
+            });
+
+            Car car = (Car) enhancer.create();
+            car.run();
+            counter++;
+            System.out.println("目前创建了"+counter+"个car类的子类了");
+        }
+    }
+
+    static class Car{
+        public void run(){
+            System.out.println("汽车启动，开始行驶......");
+        }
+    }
+}
+```
+
+
+
+<img src="JVM.assets/image-20210509110711774.png" alt="image-20210509110711774" style="zoom:80%;" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 10.2 虚拟机栈内存溢出
+
+
+
+<img src="JVM.assets/image-20210509094348959.png" alt="image-20210509094348959" style="zoom:50%;" />
+
+
+
+
+
+jvm启动后，HelloWorld 类被加载到内存里，通过 main线程执行main()方法，在main线程的虚拟机栈内，压入main（）方法对应的栈桢，里面放入main（）方法的局部变量。
+
+main中调用 sayHello()方法，sayHello也一样，它的栈桢也压入到main线程的虚拟机栈中。
+
+![image-20210509111718016](JVM.assets/image-20210509111718016.png)
+
+
+
+sayHello 方法如果运行完，就不需要这个方法在内存中保存他的局部变量了，此时他的栈桢将会出栈.
+
+每次方法调用的栈桢都是要占内存。
+
+一个线程的虚拟机栈内存大小是有限的，比如1MB。如果不停调用方法，最终就会发生栈内存溢出.
+
+<img src="JVM.assets/image-20210509095033180.png" alt="image-20210509095033180" style="zoom:80%;" />
+
+递归不停调用同一个方法，很容易栈内存溢出。
+
+一般来说栈内存溢出，都是代码的bug，正常情况下发生的比较少。
+
+
+
+
+
+**模拟虚拟机栈内存溢出**
+
+<img src="JVM.assets/image-20210509111352309.png" alt="image-20210509111352309" style="zoom:50%;" />
+
+#### 10.3 堆内存溢出
+
+<img src="JVM.assets/image-20210509101137445.png" alt="image-20210509101137445" style="zoom:67%;" />
+
+
+
+**模拟堆内存溢出**
+
+<img src="JVM.assets/image-20210509111930668.png" alt="image-20210509111930668" style="zoom:50%;" />
+
+
+
+### 11.JVM内存溢出的时候自动dump内存快照
+
+
+
+<img src="JVM.assets/image-20210509145645052.png" alt="image-20210509145645052" style="zoom:50%;" />
+
+
+
+
+
+<img src="JVM.assets/image-20210509145748646.png" alt="image-20210509145748646" style="zoom:50%;" />
 
