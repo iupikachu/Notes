@@ -6,13 +6,13 @@
 
 ## JVM
 
-
+笔记来自于: 《从 0 开始带你成为JVM实战高手》 --儒猿技术窝
 
 ### 1.前言
 
 #### 1. 1 java代码如何运行?
 
-![image-20210309163548308](JVM.assets/image-20210309163548308.png)
+![image-20210309163548308](https://gitee.com/iupikachu/img/raw/master/img/20210511152114.png)
 
 .java              .class              01100101  
 
@@ -83,7 +83,7 @@ Application ClassLoader 复制加载 "ClassPath" 环境变量所指定的路径�
 
 
 
-![image-20210309162656294](JVM.assets/image-20210309162656294.png)
+![image-20210309162656294](https://gitee.com/iupikachu/img/raw/master/img/20210511152122.png)
 
 
 
@@ -138,7 +138,7 @@ public class B {
 
 
 
-![image-20210311145810181](JVM.assets/image-20210311145810181.png)
+![image-20210311145810181](https://gitee.com/iupikachu/img/raw/master/img/20210511152129.png)
 
 
 
@@ -148,7 +148,7 @@ public class B {
 
 
 
-<img src="JVM.assets/image-20210508141324385.png" alt="image-20210508141324385" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152136.png" alt="image-20210508141324385" style="zoom:50%;" />
 
 #### 1.6 垃圾回收
 
@@ -260,7 +260,7 @@ public class A {
 
 
 
-![image-20210312122743441](JVM.assets/image-20210312122743441.png)
+![image-20210312122743441](https://gitee.com/iupikachu/img/raw/master/img/20210511152151.png)
 
 
 
@@ -272,7 +272,7 @@ public class A {
 
 假设 loadB（）方法执行完毕，这个方法的栈桢出栈，导致没有变量引用B实例对象。
 
-![image-20210312124818124](JVM.assets/image-20210312124818124.png)
+![image-20210312124818124](https://gitee.com/iupikachu/img/raw/master/img/20210511152156.png)
 
 会立即触发垃圾回收吗？
 
@@ -282,7 +282,7 @@ public class A {
 
 
 
-![image-20210312125808731](JVM.assets/image-20210312125808731.png)
+![image-20210312125808731](https://gitee.com/iupikachu/img/raw/master/img/20210511152202.png)
 
 
 
@@ -341,9 +341,9 @@ java -jar 命令启动时直接在后面跟上jvm参数
 
 11. -XX: PretenureSizeThreshold （新生代大小阈值） 超过直接进入老年代
 
-    <img src="JVM.assets/image-20210508140619858.png" alt="image-20210508140619858" style="zoom:50%;" />
+    <img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152208.png" alt="image-20210508140619858" style="zoom:50%;" />
 
-![image-20210312133304485](JVM.assets/image-20210312133304485.png)
+![image-20210312133304485](https://gitee.com/iupikachu/img/raw/master/img/20210511152212.png)
 
 
 
@@ -375,7 +375,7 @@ https://stackoverflow.com/questions/40891433/understanding-metaspace-line-in-jvm
 
 ### 2.百万流量订单系统预估
 
-![image-20210312164527744](JVM.assets/image-20210312164527744.png)
+![image-20210312164527744](https://gitee.com/iupikachu/img/raw/master/img/20210511152224.png)
 
 ​	现在一秒可能处理不了1000个订单了，因为压力骤增，系统性能下降，可能偶尔会出现某个请求处理完毕需要几秒甚至几十秒的时间，这时频繁触发gc回收机制，而一些请求处理的特别慢，就会进入老年代，老年代也越来越多，也会频繁触发老年代的垃圾回收，老年代的垃圾回收非常慢，极大影响系统性能。
 
@@ -463,7 +463,7 @@ finalize（）方法可以拯救。
 
 加入某个对象要被垃圾回收了，但是这个对象重写了Object类中的 finalize()方法并且这个方法中把自己给某个Gc roots变量。
 
-![image-20210312205307246](JVM.assets/image-20210312205307246.png)
+![image-20210312205307246](https://gitee.com/iupikachu/img/raw/master/img/20210511152231.png)
 
 重新让instance这个 gc roots 变量引用了自己。就不用被垃圾回收了。
 
@@ -477,7 +477,7 @@ finalize（）方法可以拯救。
 
 
 
-![image-20210313114504935](JVM.assets/image-20210313114504935.png)
+![image-20210313114504935](https://gitee.com/iupikachu/img/raw/master/img/20210511152236.png)
 
 
 
@@ -523,7 +523,7 @@ finalize（）方法可以拯救。
 
 
 
-![image-20210313123221676](JVM.assets/image-20210313123221676.png)
+![image-20210313123221676](https://gitee.com/iupikachu/img/raw/master/img/20210511152245.png)
 
 
 
@@ -610,7 +610,7 @@ survivor区内存比较小，所以尽可能保证在一次Minor gc后，如果s
 
 一张图总结一下
 
-![image-20210314124016461](JVM.assets/image-20210314124016461.png)
+![image-20210314124016461](https://gitee.com/iupikachu/img/raw/master/img/20210511152251.png)
 
 
 
@@ -740,7 +740,7 @@ CMS 采取 **垃圾回收线程和系统工作线程尽量同时执行的模式�
 
   系统恢复运行，然后清理之前标记的垃圾对象。很耗时，但是是和程序并发运行，所以不影响系统的运行。
 
-![image-20210315105540039](JVM.assets/image-20210315105540039.png)
+![image-20210315105540039](https://gitee.com/iupikachu/img/raw/master/img/20210511152259.png)
 
 
 
@@ -812,7 +812,7 @@ G1 垃圾回收器可以同时回收新生代和老年代的对象，一个人�
 
 **内存结构**: 把java堆内存拆分为多个大小相等的Regin,新生代可能包含了某些块，老年代可能包含某些块。
 
-![image-20210317134821726](JVM.assets/image-20210317134821726.png)
+![image-20210317134821726](https://gitee.com/iupikachu/img/raw/master/img/20210511152306.png)
 
 
 
@@ -824,7 +824,7 @@ G1 垃圾回收器可以同时回收新生代和老年代的对象，一个人�
 
 **实现原理**: 追踪每个 Region里的**回收价值** （耗费时间，垃圾对象大小）
 
-![image-20210317135333475](JVM.assets/image-20210317135333475.png)
+![image-20210317135333475](https://gitee.com/iupikachu/img/raw/master/img/20210511152310.png)
 
 
 
@@ -922,7 +922,7 @@ G1 就会通过之前说的，追踪每个Region回收时间，垃圾对象大�
 
 
 
-![image-20210317145521505](JVM.assets/image-20210317145521505.png)
+![image-20210317145521505](https://gitee.com/iupikachu/img/raw/master/img/20210511152317.png)
 
 
 
@@ -990,7 +990,7 @@ ps: 在最后一个阶段"**混合回收**"的时候，会停止程序运行，�
 
 
 
-![image-20210318101504645](JVM.assets/image-20210318101504645.png)
+![image-20210318101504645](https://gitee.com/iupikachu/img/raw/master/img/20210511152322.png)
 
 
 
@@ -1058,7 +1058,7 @@ Mixed gc 触发条件是老年代到达 IHOP 设置的值。
 
 **要结合自己系统的运行，根据系统的内存占用情况，GC后的对象存活情况，合理分配 Eden、Survivor、老年代的内存大小，合理设置一些参数。**
 
-![image-20210315092631519](https://gitee.com/iupikachu/img/raw/master/img/20210316103952.png)
+![image-20210315092631519](https://gitee.com/iupikachu/img/raw/master/img/20210511152328.png)
 
 **背景1:**
 
@@ -1126,7 +1126,7 @@ jdk1.6以后废弃了 -XX:HandlePromotionFailure
 
 **参数设置:**
 
-![image-20210316103141121](https://gitee.com/iupikachu/img/raw/master/img/20210316103141.png)
+![image-20210316103141121](https://gitee.com/iupikachu/img/raw/master/img/20210511152332.png)
 
 
 
@@ -1179,11 +1179,11 @@ public class Demo1 {
 }
 ```
 
-![image-20210320160743587](JVM.assets/image-20210320160743587.png)
+![image-20210320160743587](https://gitee.com/iupikachu/img/raw/master/img/20210511152338.png)
 
 
 
-![image-20210320155547208](JVM.assets/image-20210320155547208.png)
+![image-20210320155547208](https://gitee.com/iupikachu/img/raw/master/img/20210511152341.png)
 
 
 
@@ -1207,17 +1207,17 @@ jvm参数:
 
 
 
-![image-20210322142942783](JVM.assets/image-20210322142942783.png)
+![image-20210322142942783](https://gitee.com/iupikachu/img/raw/master/img/20210511152348.png)
 
-<img src="JVM.assets/image-20210322153329774.png" alt="image-20210322153329774" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152351.png" alt="image-20210322153329774" style="zoom:67%;" />
 
-<img src="JVM.assets/image-20210322153423278.png" alt="image-20210322153423278" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152354.png" alt="image-20210322153423278" style="zoom:67%;" />
 
 
 
 如下是日志
 
-![image-20210322142153373](JVM.assets/image-20210322142153373.png)
+![image-20210322142153373](https://gitee.com/iupikachu/img/raw/master/img/20210511152358.png)
 
 
 
@@ -1260,13 +1260,13 @@ public static void main(String[] args) {
 
 内存模型如下
 
-<img src="JVM.assets/image-20210322145835142.png" alt="image-20210322145835142" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152403.png" alt="image-20210322145835142" style="zoom:50%;" />
 
 
 
 日志如下
 
-![image-20210322145930374](JVM.assets/image-20210322145930374.png)
+![image-20210322145930374](https://gitee.com/iupikachu/img/raw/master/img/20210511152407.png)
 
 
 
@@ -1292,13 +1292,13 @@ CMS: 8194K->6651K(10240K) 老年代的 8MB对象占用变成了6MB。为什么�
 
 是因为在young gc的时候先把 2个 2MB数组对象放入老年代。
 
-![image-20210322151009834](JVM.assets/image-20210322151009834.png)
+![image-20210322151009834](https://gitee.com/iupikachu/img/raw/master/img/20210511152411.png)
 
 再接着放剩下的2MB数组对象和一个128KB的数组对象时，放不下了，这时才触发的 Full Gc。
 
 回收掉那 4MB的垃圾对象。接着再放入。
 
-![image-20210322151139044](JVM.assets/image-20210322151139044.png)
+![image-20210322151139044](https://gitee.com/iupikachu/img/raw/master/img/20210511152414.png)
 
 最后年轻代已经空了，所以把 array6变量引用的 2MB数组对象放入 eden。
 
@@ -1336,7 +1336,7 @@ eden space 8192K,  27% used
 
  随时执行 jstat看到的就是系统启动以来的数据。
 
-![image-20210324140021765](JVM.assets/image-20210324140021765.png)
+![image-20210324140021765](https://gitee.com/iupikachu/img/raw/master/img/20210511152418.png)
 
 
 
@@ -1356,7 +1356,7 @@ jstat -gc Pid 1000 1000
 
 
 
-![image-20210324140317782](JVM.assets/image-20210324140317782.png)
+![image-20210324140317782](https://gitee.com/iupikachu/img/raw/master/img/20210511152423.png)
 
 
 
@@ -1372,7 +1372,7 @@ jstat -gc Pid 1000 1000
 
 
 
-![image-20210324140804744](JVM.assets/image-20210324140804744.png)
+![image-20210324140804744](https://gitee.com/iupikachu/img/raw/master/img/20210511152428.png)
 
 
 
@@ -1491,7 +1491,7 @@ jstat -gc
 
 ### 8.每秒10万 qps的社交app优化gc性能
 
-<img src="JVM.assets/image-20210429151151192.png" alt="image-20210429151151192" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152438.png" alt="image-20210429151151192" style="zoom:50%;" />
 
 
 
@@ -1690,7 +1690,7 @@ JVM空闲内存空间 3000MB  SoftRefLRUPolicyMSPerMB 默认值: 1000ms
 
 -XX:+UseCMSInitiatingOccupancyOnly -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintHeapAtGC
 
-<img src="JVM.assets/0.png" alt="img" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152451.png" alt="img" style="zoom:50%;" />
 
 
 
@@ -1738,7 +1738,7 @@ JVM空闲内存空间 3000MB  SoftRefLRUPolicyMSPerMB 默认值: 1000ms
 
 然后再配合上年轻代还偶尔会有Young GC后几十MB对象进入老年代，所以才会30分钟触发一次Full GC！
 
-<img src="JVM.assets/0-20210506155834139.png" alt="img" style="zoom:80%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152458.png" alt="img" style="zoom:80%;" />
 
 
 
@@ -1776,7 +1776,7 @@ select * from tbl。
 
 
 
-#### 9.3 内存泄露  （mat使用）
+#### 9.3 cpu飙高-内存泄露  （mat使用） 
 
 
 
@@ -1819,9 +1819,9 @@ select * from tbl。
 
 首先用jmap对线上系统导出一份**内存快照**。
 
-<img src="JVM.assets/image-20210508094636918.png" alt="image-20210508094636918" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152506.png" alt="image-20210508094636918" style="zoom:67%;" />
 
-<img src="JVM.assets/image-20210508094621348.png" alt="image-20210508094621348" style="zoom:80%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152510.png" alt="image-20210508094621348" style="zoom:80%;" />
 
 ```bash
 jmap -dump:format=b,file=文件名[服务进程id]
@@ -1846,11 +1846,11 @@ tips：如果报 failer create java virtual machine
    /Library/Java/JavaVirtualMachines/jdk1.8.0_281.jdk/Contents/Home/bin
    ```
 
-<img src="JVM.assets/image-20210509151054341.png" alt="image-20210509151054341" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152516.png" alt="image-20210509151054341" style="zoom:50%;" />
 
 3. 执行 MemoryAnalyzer 脚本
 
-   <img src="JVM.assets/image-20210509151224402.png" alt="image-20210509151224402" style="zoom:50%;" />
+   <img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152519.png" alt="image-20210509151224402" style="zoom:50%;" />
 
 4. 再启动mat就可以了
 
@@ -1858,7 +1858,7 @@ tips：如果报 failer create java virtual machine
 
 下载后，安装目录里有一个文件名字: MemoryAnalyzer.ini
 
-<img src="JVM.assets/image-20210506191536254.png" alt="image-20210506191536254" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152522.png" alt="image-20210506191536254" style="zoom:67%;" />
 
 
 
@@ -1882,9 +1882,9 @@ tips：如果报 failer create java virtual machine
 
 ​	类似 EHCache之类的缓存框架就可以，他会固定最多缓存多少个对象，定期淘汰删除掉一些不怎么访问的缓存，以便于新数据进入缓存。
 
+**总结:**
 
-
-
+![1931620640694_.pic](https://gitee.com/iupikachu/img/raw/master/img/20210511152528.jpg)
 
 #### 9.4  String.split() 造成内存泄露
 
@@ -1906,7 +1906,7 @@ jdk1.7 则给每一个切分出来的字符串都创建一个新的数组。
 
 
 
-<img src="JVM.assets/image-20210508105542083.png" alt="image-20210508105542083" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152531.png" alt="image-20210508105542083" style="zoom:67%;" />
 
 
 
@@ -1914,7 +1914,7 @@ jdk1.7 则给每一个切分出来的字符串都创建一个新的数组。
 
 #### 9.6 结合自己的项目优化jvm
 
-<img src="JVM.assets/image-20210508140300424.png" alt="image-20210508140300424" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152536.png" alt="image-20210508140300424" style="zoom:50%;" />
 
 
 
@@ -1965,7 +1965,7 @@ metaSpace里的类回收的条件相当的苛刻: 比如这个类的类加载器
 
 **模拟MetaSpace内存溢出**
 
-<img src="JVM.assets/image-20210509104415998.png" alt="image-20210509104415998" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152542.png" alt="image-20210509104415998" style="zoom:67%;" />
 
 
 
@@ -2013,17 +2013,118 @@ public class Demo1 {
 
 
 
-<img src="JVM.assets/image-20210509110711774.png" alt="image-20210509110711774" style="zoom:80%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152546.png" alt="image-20210509110711774" style="zoom:80%;" />
 
 
 
 
 
+**用mat分析内存情况:**
+
+jvm参数
+
+```bash
+-XX:+UseParNewGC
+-XX:+UseConcMarkSweepGC
+-XX:MetaspaceSize=10m
+-XX:MaxMetaspaceSize=10m
+-XX:+PrintGCDetails
+-Xloggc:gc.log
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=./
+```
 
 
 
+gc.log
+
+```log
+Java HotSpot(TM) 64-Bit Server VM (25.191-b12) for bsd-amd64 JRE (1.8.0_191-b12), built on Oct  6 2018 08:37:07 by "java_re" with gcc 4.2.1 (Based on Apple Inc. build 5658) (LLVM build 2336.11.00)
+Memory: 4k page, physical 16777216k(909532k free)
+
+/proc/meminfo:
+
+CommandLine flags: -XX:CompressedClassSpaceSize=2097152 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=./ -XX:InitialHeapSize=268435456 -XX:MaxHeapSize=4294967296 -XX:MaxMetaspaceSize=10485760 -XX:MaxNewSize=697933824 -XX:MaxTenuringThreshold=6 -XX:MetaspaceSize=10485760 -XX:OldPLABSize=16 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
+1.233: [GC (Allocation Failure) 1.234: [ParNew: 69952K->2029K(78656K), 0.0075673 secs] 69952K->2029K(253440K), 0.0077994 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+1.752: [Full GC (Metadata GC Threshold) 1.752: [CMS: 0K->2483K(174784K), 0.0597141 secs] 67239K->2483K(253440K), [Metaspace: 9632K->9632K(1058816K)], 0.0598852 secs] [Times: user=0.11 sys=0.02, real=0.06 secs] 
+1.812: [Full GC (Last ditch collection) 1.812: [CMS: 2483K->1491K(174784K), 0.0158886 secs] 2483K->1491K(253504K), [Metaspace: 9632K->9632K(1058816K)], 0.0160045 secs] [Times: user=0.02 sys=0.00, real=0.02 secs] 
+1.866: [Full GC (Metadata GC Threshold) 1.866: [CMS: 1491K->1489K(174784K), 0.0190498 secs] 2836K->1489K(253504K), [Metaspace: 9653K->9653K(1058816K)], 0.0193842 secs] [Times: user=0.04 sys=0.00, real=0.02 secs] 
+1.885: [Full GC (Last ditch collection) 1.885: [CMS: 1489K->1489K(174784K), 0.0177313 secs] 1489K->1489K(253504K), [Metaspace: 9653K->9653K(1058816K)], 0.0179918 secs] [Times: user=0.04 sys=0.00, real=0.02 secs] 
+1.903: [GC (CMS Initial Mark) [1 CMS-initial-mark: 1489K(174784K)] 1489K(253504K), 0.0021433 secs] [Times: user=0.00 sys=0.01, real=0.00 secs] 
+1.906: [CMS-concurrent-mark-start]
+1.909: [CMS-concurrent-mark: 0.003/0.003 secs] [Times: user=0.02 sys=0.00, real=0.00 secs] 
+Heap
+1.909: [CMS-concurrent-preclean-start]
+ par new generation   total 78720K, used 3446K [0x00000006ffe00000, 0x0000000705360000, 0x0000000729790000)
+  eden space 70016K,   4% used [0x00000006ffe00000, 0x000000070015d858, 0x0000000704260000)
+  from space 8704K,   0% used [0x0000000704260000, 0x0000000704260000, 0x0000000704ae0000)
+  to   space 8704K,   0% used [0x0000000704ae0000, 0x0000000704ae0000, 0x0000000705360000)
+ concurrent mark-sweep generation total 174784K, used 1489K [0x0000000729790000, 0x0000000734240000, 0x00000007ffe00000)
+ Metaspace       used 9660K, capacity 10186K, committed 10240K, reserved 1058816K
+  class space    used 855K, capacity 881K, committed 896K, reserved 1048576K
+1.910: [CMS-concurrent-preclean: 0.001/0.001 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+1.910: [CMS-concurrent-abortable-preclean-start]
+
+```
 
 
+
+**分析log：**
+
+```bash
+1.233: [GC (Allocation Failure) 1.234: [ParNew: 69952K->2029K(78656K), 0.0075673 secs] 69952K->2029K(253440K), 0.0077994 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+```
+
+**第一次 young gc：** 第一次 gc Allocation Failure 说明: 在eden区分配对象时，发现eden区内存不足，于是触发young gc。
+
+```java
+Enhancer enhancer = new Enhancer();
+```
+
+因为 Enhancer本身是一个对象。上述代码不止会动态生成类，还会生成很多对象。
+
+
+
+```bash
+1.752: [Full GC (Metadata GC Threshold) 1.752: [CMS: 0K->2483K(174784K), 0.0597141 secs] 67239K->2483K(253440K), [Metaspace: 9632K->9632K(1058816K)], 0.0598852 secs] [Times: user=0.11 sys=0.02, real=0.06 secs] 
+```
+
+**第二次 Full gc:** Metadata GC Threshold 说明 Metaspace区域满了，所以触发了Full GC. 老年代增加了 2483K ，总的堆内存从 67239k 减少到 2483k  metaSpace 9632k保持不变。 说明这次Full gc 把 eden区的大部分垃圾回收了，剩下的 2483k很有可能是 jvm运行需要的对象，放不下s区，直接放入老年代，然而Metaspace区域的类内部是被 cglib引用的，所以全部无法回收。 **tip: 参数里我们设置了metaspace为10m，这里的 1058816k 不用理会。**
+
+
+
+```bash
+
+1.812: [Full GC (Last ditch collection) 1.812: [CMS: 2483K->1491K(174784K), 0.0158886 secs] 2483K->1491K(253504K), [Metaspace: 9632K->9632K(1058816K)], 0.0160045 secs] [Times: user=0.02 sys=0.00, real=0.02 secs] 
+```
+
+**第三次 Full gc:**   Last ditch collection 说明这是最后拯救的机会，metaSpace 还是无法回收。将近占满了 10M内存。接着jvm直接退出了，年轻代和老年代几乎没什么占用。
+
+
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152600.png" alt="image-20210510112106126" style="zoom:50%;" />
+
+**控制台明确抛出oom 异常**
+
+
+
+**用 mat 进行内存快照分析**
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152557.png" alt="image-20210510112237228" style="zoom:50%;" />
+
+说明实例最多的是 AppClassLoader。因为CGLIB 之类的东西在动态生成类的时候搞出来的。点击 **Details** 查看.
+
+
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152604.png" alt="image-20210510112514789" style="zoom:70%;" />
+
+有一大堆 Demo1 动态生成出来的 Car EnhancerBYCGLIB 的类。
+
+真相大白，是Demo1里面搞出来的一大堆的动态生成类，填满了Metaspace。
+
+
+
+**解决方法**: 对Enhancer 缓存。
 
 
 
@@ -2031,7 +2132,7 @@ public class Demo1 {
 
 
 
-<img src="JVM.assets/image-20210509094348959.png" alt="image-20210509094348959" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152616.png" alt="image-20210509094348959" style="zoom:50%;" />
 
 
 
@@ -2041,7 +2142,7 @@ jvm启动后，HelloWorld 类被加载到内存里，通过 main线程执行main
 
 main中调用 sayHello()方法，sayHello也一样，它的栈桢也压入到main线程的虚拟机栈中。
 
-![image-20210509111718016](JVM.assets/image-20210509111718016.png)
+![image-20210509111718016](https://gitee.com/iupikachu/img/raw/master/img/20210511152619.png)
 
 
 
@@ -2051,7 +2152,7 @@ sayHello 方法如果运行完，就不需要这个方法在内存中保存他�
 
 一个线程的虚拟机栈内存大小是有限的，比如1MB。如果不停调用方法，最终就会发生栈内存溢出.
 
-<img src="JVM.assets/image-20210509095033180.png" alt="image-20210509095033180" style="zoom:80%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152623.png" alt="image-20210509095033180" style="zoom:80%;" />
 
 递归不停调用同一个方法，很容易栈内存溢出。
 
@@ -2063,17 +2164,33 @@ sayHello 方法如果运行完，就不需要这个方法在内存中保存他�
 
 **模拟虚拟机栈内存溢出**
 
-<img src="JVM.assets/image-20210509111352309.png" alt="image-20210509111352309" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152627.png" alt="image-20210509111352309" style="zoom:50%;" />
+
+
+
+栈内存溢出分析 gc日志和内存快照是没用的。
+
+看本地日志文件即可。
+
+
+
+
 
 #### 10.3 堆内存溢出
 
-<img src="JVM.assets/image-20210509101137445.png" alt="image-20210509101137445" style="zoom:67%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152634.png" alt="image-20210509101137445" style="zoom:67%;" />
 
 
 
 **模拟堆内存溢出**
 
-<img src="JVM.assets/image-20210509111930668.png" alt="image-20210509111930668" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152639.png" alt="image-20210509111930668" style="zoom:50%;" />
+
+
+
+
+
+
 
 
 
@@ -2081,11 +2198,224 @@ sayHello 方法如果运行完，就不需要这个方法在内存中保存他�
 
 
 
-<img src="JVM.assets/image-20210509145645052.png" alt="image-20210509145645052" style="zoom:50%;" />
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152639.png" alt="image-20210509145645052" style="zoom:50%;" />
+
+
+
+**JVM 参数模板**
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152649.png" alt="image-20210509145748646" style="zoom:50%;" />
+
+
+
+**分析堆内存溢出**
+
+```bash
+java.lang.OutOfMemoryError: Java heap space
+Dumping heap to ./java_pid1023.hprof ...
+Heap dump file created [13409210 bytes in 0.033 secs]
+
+Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
+```
+
+
+
+这个就很明显告诉我们，是Java堆内存溢出了，而且他还给我们导出了一份内存快照。
+
+所以此时我们GC日志都不用分析了，因为堆内存溢出往往对应着大量的GC日志，所以你分析起来是很麻烦的。
+
+此时直接将线上自动导出的内存快照拷贝回本地笔记本电脑，然后用MAT分析即可。
+
+
+
+### 12.案例实战
+
+
+
+#### 12.1 微服务远程调用失败导致oom
+
+
+
+**背景**: 系统突然崩溃，oom问题。
+
+
+
+1. 登录系统线上机器查看对应的日志。
+
+   看两点:
+
+   * 看看是堆溢出、还是栈内存溢出或是Metaspace溢出
+   * 看看是哪个线程(tomcat线程 我们自己写的代码的线程)
+
+​       当时在机器的日志文件中看到类似下面的一句话：
+
+```bash
+Exception in thread "http-nio-8080-exec-1089" java.lang.OutOfMemoryError: Java heap space
+```
+
+这其实是tomcat的工作线程   : 堆内存溢出
+
+线上系统记得设置:
+
+```bash
+-XX:+HeapDumpOnOutOfMemoryError
+```
+
+**这个参数会在系统内存溢出的时候导出来一份内存快照到我们指定的位置。**
+
+
+
+2. Mat 对内存快照进行分析
+
+   发现占据内存最大的是大量的“byte[]”数组一大堆的byte[]数组就占据了大约8G左右的内存空间。而我们当时线上机器给Tomcat的JVM堆内存分配的也就是8G左右的内存而已。
+
+   结论:	Tomcat工作线程在处理请求的时候会创建大量的byte[]数组，大概有8G左右，直接把JVM堆内存占满了。
+
+
+
+在MAT上可以继续查看一下这个数组是被谁引用的，大致可以发现是Tomcat的类引用的，具体来说是类似下面的这个类：org.apache.tomcat.util.threads.TaskThread
+
+这个类一看就是Tomcat自己的线程类，因此可以认为是Tomcat的线程创建了大量的byte[]数组，占据了8G的内存空间。
+
+我们发现Tomcat的工作线程大致有400个左右，也就是说每个Tomcat的工作线程会创建2个byte[]数组，每个byte[]数组是10MB左右
+
+最终就是400个Tomcat工作线程同时在处理请求，结果创建出来了8G内存的byte[]数组，进而导致了内存溢出。
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152702.png" alt="image-20210510145911875" style="zoom:50%;" />
 
 
 
 
 
-<img src="JVM.assets/image-20210509145748646.png" alt="image-20210509145748646" style="zoom:50%;" />
+3. 分析系统
+
+   一秒钟之内瞬间来了400个请求，导致Tomcat的400个工作线程全部上阵处理请求，每个工作线程在处理一个请求的时候，会创建2个数组，每个数组是10MB，结果导致瞬间就让8G的内存空间被占满了。
+
+   
+
+   检查了一下系统的监控，发现每秒请求并不是400，而是100！
+
+   也就是说明明每秒才100个请求，**怎么可能Tomcat的400个线程都处于工作状态？**
+
+   如果每秒来100个请求，但是每个请求处理完毕需要4秒的时间，那么在4秒内瞬间会导致有400个请求同时在处理，也就会导致Tomcat的400个工作线程都在工作！接着就会导致上述的情况。
+
+   
+
+   **为什么Tomcat工作线程在处理一个请求的时候会创建2个10MB的数组？**
+
+   到Tomcat的配置文件里搜索一下，发现了如下的一个配置：max-http-header-size: 10000000
+
+   导致Tomcat工作线程在处理请求的时候会创建2个数组，每个数组的大小如上面配置就是10MB。
+
+   梳理一遍系统运行时候的场景:
+
+   每秒100个请求，每个请求处理需要4秒，导致4秒内有400个请求同时被400个线程在处理，每个线程会根据配置创建2个数组，每个数组是10MB，占满了8G的内存。
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152706.png" alt="image-20210510150121167" style="zoom:70%;" />
+
+* **为什么处理一个请求需要4秒钟？**
+
+  这个问题绝对是偶发性的，不是平时每次处理请求都如此，因为负责这个系统的工程师说了，平时处理一个请求也就几百毫秒的时间而已。
+
+  好，那么既然如此，唯一的办法只能是在日志里去找问题了，继续翻看事故发生时的日志，发现日志中除了OOM以外，其实有大量的服务请求调用超时的异常，类似下面那样子：
+
+  Timeout Exception....
+
+  也就是说，我们的这个系统在通过RPC调用其他系统的时候突然出现了大量的请求超时，立马翻看一下系统的RPC调用超时的配置，惊讶的发现，负责这个系统的工程师居然将服务RPC调用超时时间设置为了刚好是4秒！
+
+  <img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152716.png" alt="image-20210511074036404" style="zoom:80%;" />
+
+  之所以每个请求需要处理4秒钟，是因为下游服务故障了，网络请求都是失败的，此时会按照设置好的4秒超时时间一直卡住4秒钟之后才会抛出Timeout异常，然后请求处理结束。
+
+  
+
+  **解决方法:**
+
+  最核心的问题就是那个超时时间设置的实在太长了，因此立马将超时时间改为1秒即可。
+
+  另外一个，对Tomcat的那个参数，max-http-header-size，可以适当调节的小一些就可以了，这样Tomcat工作线程自身为请求创建的数组，不会占据太大的内存空间的。
+
+
+
+​		超时时间调为1秒个人不太认可,基于RPC的调用时不时会有处理超过1秒的情况，如果超时设置成一秒，失败请求率会太高。tomcat的工作线程数量400个已经挺多了，其实没有必要弄这么多。
+
+ 我的建议：  
+
+连接的超时时间 ribbon.ConnectTimeout=2000 
+
+获取数据超时时间 ribbon.ReadTimeout=3000 
+
+ 工作线程数 tomcat.max-threads: 200  
+
+ tomcat.accept-count: 1000 
+
+如果队列中已经有上千个请求等待处理基本可以断定处理过程出现问题,这个时候没有必要再向队列中放请求了,放进去一时半会也处理不了,不如直接快速失败,返回错误,保护自身应用
+
+单台服务器接受20000个tcp连接已经很多了 tomcat.max-connections: 20000
+
+
+
+#### 12.2  数据同步系统频繁 Full gc
+
+
+
+**背景：**
+
+线上有一个数据同步系统，专门负责从另外一个系统同步数据，从kafka里消费数据，接着保存到自己的数据库。
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152723.png" alt="image-20210511084126093" style="zoom:80%;" />
+
+
+
+这个系统时不时报一个内存溢出的错误，重启系统，过了一段时间会再次内存溢出。
+
+
+
+**分析:** 既然是每次重启过后都会在一段时间出现内存溢出，说明肯定是每次重启过后，内存都会不断上涨。
+
+一般JVM出现内存溢出，通常就两种情况: 
+
+* 并发太高，瞬间创建大量对象
+* 内存泄露，很多对象赖在内存里，无法回收
+
+
+
+**排查:**
+
+1. Jstat观察jvm情况
+
+   发现老年代一直在增长。Full gc 回收不掉老年代对象
+
+2.  Mat 分析内存快照
+
+   有一个队列数据结构，直接引用大量的数据，就是这个队列数据结构占满了内存。
+
+   那么这个队列是干什么用的?简单来说,从 Kafka消费出来的数据会先写入这个队列,接着从这个队列再慢慢写入数据库中,这个主要是要额外做一些中间的数据处理和转换,所以自己在中间又加了一个队列。
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152727.png" alt="image-20210511092832218" style="zoom:80%;" />
+
+
+
+**那么这个队列是怎么用的?问题就出在这里了!**
+大家都知道,从 Kafka消费数据,是可以一下子消费一批出来的,比如消费几百条数据粗来。因此当时这个写代码的同学,直接就是每次消费几百条数据出来给做成一个Lst,然后把这个Lst放入到队列里去!
+最后就搞成了,一个队列比如有1000个元素,每个元素都是一个List,每个List里都有几百条数据!这种做法怎么行?会导致内存中的队列里积压几十万条,甚至百万条数据!最终一定会导致内存溢出!
+而且只要你数据还停留在队列中,就是没有办法被回收的
+
+
+
+典型的生产和消费的速率没控制好。从 kafka里消费出数据放入队列速度很快，但是从队列里消费数据进行处理写入存储的速度较慢。导致内存队列快速积压数据，导致内存溢出。
+
+
+
+**解决方法:**
+
+把队列改成定长的阻塞队列，比如最多 1024个元素，每次从kafka消费出来的数据，一条一条写入队列，而不是做成list 放入队列作为一个元素。
+
+一旦内存队列满了，此时 kafka消费线程会停止工作，因为被队列给阻塞了。不会让内存队列中的数据过多。
+
+<img src="https://gitee.com/iupikachu/img/raw/master/img/20210511152731.png" alt="image-20210511093759781" style="zoom:80%;" />
+
+
+
+
 
