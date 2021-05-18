@@ -322,6 +322,123 @@ redo log 用于保证 crash-safe 能力。**innodb_flush_log_at_trx_commit** 这
 
 
 
+
+
+
+
+**分析一条 update 语句**
+
+```sql
+#原先的 name = 'zhangsan'
+update users set name = 'xxx' where id =10
+```
+
+
+
+innoDB 会先将 "id = 10"这一行数据看看是否在缓冲池里，如果不在的话会直接从磁盘里加载到缓冲池里，而且还会对这行记录加**独占锁**。
+
+<img src="Mysql 实战.assets/image-20210517094548955.png" alt="image-20210517094548955" style="zoom:50%;" />
+
+
+
+
+
+innodb把要更新的值 zhangsan id=10 这些信息写入到 **undo日志**中。
+
+<img src="Mysql 实战.assets/image-20210517094738587.png" alt="image-20210517094738587" style="zoom:50%;" />
+
+
+
+先更新内存缓冲池中的记录，此时这个记录就是**脏数据**。
+
+磁盘上这行数据的 name 还是 zhangsan , 但是内存里这行数据已经被修改了。
+
+<img src="Mysql 实战.assets/image-20210517095035020.png" alt="image-20210517095035020" style="zoom:50%;" />
+
+
+
+为了避免此时mysql宕机，导致内存中的数据丢失，此时把对内存所做的修改写入到 **Redo Log Buffer** 中。
+
+redo日志，其实就是记录修改 id=10 修改了name 字段为xxx。
+
+<img src="Mysql 实战.assets/image-20210517095308519.png" alt="image-20210517095308519" style="zoom:50%;" />
+
+
+
+假设: 发生宕机，事务没提交，此时丢失了内存中的数据和redo log，事务失败，数据还是正确的，无影响。
+
+我们要提交事务了，就要依据设置的策略先把redo 日志从 redo log buffer 刷入到磁盘文件里。
+
+策略: innodb_flush_log_at_trx_commitu 参数
+
+1. 设置为 0，提交事务不会把 redo log buffer 里的日志刷入磁盘。此时宕机，内存数据和日志全部丢失。
+2. 设置为1，提交事务时，必须把 redo log 刷入磁盘，此时宕机，就算更新的数据还没刷入磁盘，但是redo log 刷入了磁盘，可以根据 redo log 来恢复内存中的数据。 
+
+<img src="Mysql 实战.assets/image-20210517101515561.png" alt="image-20210517101515561" style="zoom:50%;" />
+
+<img src="Mysql 实战.assets/image-20210517101529615.png" alt="image-20210517101529615" style="zoom:50%;" />
+
+
+
+3. 设置为2，把redo log 写入磁盘文件对应的 os cache 内存缓存里，实际没到磁盘上。此时宕机，内存数据一样会丢失，会丢失一秒的数据。
+
+
+
+准备提交事务，依据策略把 **binlog** 日志写入磁盘。
+
+**binlog日志策略:** sync_binlog 参数
+
+1. sync_binlog: 0 日志写入 os cache 内存缓存。机器宕机，会丢失数据。
+2. sync_binlog: 1 强制提交事务的时候，binlog直接写入到磁盘文件里去。机器宕机，数据也可以恢复。
+
+
+
+最后把本次更新对应的 binlog文件名称和这次更新的 binlog日志在文件中的位置都写入到 redo log 日志中，同时在redo log日志文件里写入一个 commit。最终完成了事务的提交。
+
+```bash
+binlog文件名称: 
+binlog文件位置:
+commit
+```
+
+这样做是为了保持 redo log和bin log一致的。
+
+
+
+假设我们已经提交了事务
+
+内存中id 为10的 name已经是 'xxx' 了。但是磁盘里的id 为10的name 还是 'zhangsan' 。此时就是脏数据。
+
+mysql有一个io后台线程，会在某个时间，随机把内存 buffer pool中的修改后的脏数据刷回到磁盘上的数据文件。
+
+<img src="Mysql 实战.assets/image-20210517140543363.png" alt="image-20210517140543363" style="zoom:50%;" />
+
+哪怕mysql宕机了，也没关系，因为重启之后，可以根据 redo log 恢复之前提交事务的修改到内存中。把 id=10的name修改为 ‘xxx’，等合适的时机，io线程自然会把修改后的数据刷到磁盘。
+
+
+
+
+
+**update语句执行流程总结**:
+
+1. 先判断innodb的 buffer pool缓冲池里面是否有数据，如果没有就从磁盘读取,缓存到缓冲池，在更新前加独占锁。
+2. 把更新前的值写到 undo日志里面，便于后面的回滚操作。
+3. 在更新前先写 redo log 到redo log buffer里  innodb_flush_log_at_trx_commitu 参数为1,此时同步把redo log刷入到磁盘中。
+4. 准备提交事务时，sync_binlog:1  binlog日志直接写入磁盘。并且在 redo log中写入这次事务的binlog 名称和位置 和 commit。事务提交完成，事务执行成功。
+5. mysql后台io线程随机把内存中已经完成事务修改后的数据刷入到磁盘中。
+
+
+
+
+
+**问题:**
+
+<img src="Mysql 实战.assets/image-20210517133952268.png" alt="image-20210517133952268" style="zoom:50%;" />
+
+当前事务提交了，但是其他事务可能还需要 undo log 读取旧版本的数据。
+
+undo log 是回滚段，当没有事务需要使用这个 undo log 来进行版本号数据查询时会被清理。
+
 ### 3.事务
 
 
