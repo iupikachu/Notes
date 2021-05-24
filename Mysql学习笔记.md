@@ -740,7 +740,7 @@ explain SELECT * from student where match(studentname) against ('皮');
 
 
 
-#### 12.4B树
+#### 12.4 B树
 
 ![image-20201122131457614](/Users/chenqipeng/Library/Application Support/typora-user-images/image-20201122131457614.png)
 
@@ -786,7 +786,7 @@ explain SELECT * from student where match(studentname) against ('皮');
 
 
 
-### 
+
 
 ​                                                          
 

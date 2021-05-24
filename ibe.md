@@ -981,6 +981,61 @@ public void testSM4(){
 
 
 
+加密密钥:
+
+<img src="ibe.assets/image-20210521135614438.png" alt="image-20210521135614438" style="zoom:50%;" />
+
+
+
+轮密钥
+
+FK（0-3）系统参数
+
+CK (0-31) 固定参数
+
+<img src="ibe.assets/image-20210521135755863.png" alt="image-20210521135755863" style="zoom:50%;" />
+
+
+
+加密算法: 32次迭代 + 1次反序变换R
+
+
+
+```java
+public byte[] sm4_crypt_ecb(SM4_Context ctx, byte[] input) throws Exception {
+    if (input == null) {
+        throw new Exception("input is null!");
+    }
+
+    if ((ctx.isPadding) && (ctx.mode == SM4_ENCRYPT)) {
+        input = padding(input, SM4_ENCRYPT);
+    }
+
+    int length = input.length;
+    ByteArrayInputStream bins = new ByteArrayInputStream(input);
+    ByteArrayOutputStream bous = new ByteArrayOutputStream();
+    for (; length > 0; length -= 16) {
+        byte[] in = new byte[16];
+        byte[] out = new byte[16];
+        bins.read(in);
+        sm4_one_round(ctx.sk, in, out);
+        bous.write(out);
+    }
+
+    byte[] output = bous.toByteArray();
+    if (ctx.isPadding && ctx.mode == SM4_DECRYPT) {
+        output = padding(output, SM4_DECRYPT);
+    }
+    bins.close();
+    bous.close();
+    return output;
+}
+```
+
+
+
+
+
 
 
 ### SM9标识密码算法
@@ -1011,4 +1066,10 @@ String s1 = sm9Service.decrypt(id, resultCipherText);
 System.out.println("s1:"+s1);
 }
 ```
+
+
+
+
+
+
 
