@@ -69,3 +69,11 @@ sudo rm -rf /var/db/receipts/com.mysql.*
 2020-09-14T04:27:48.651023Z 1 [Note] A temporary password is generated for root@localhost: tP?!z_6Y;MX,
 
 If you lose this password, please consult the section How to Reset the Root Password in the MySQL reference manual.
+
+
+
+
+
+vi ~/.bash_profile
+
+source ~/.bash_profile
