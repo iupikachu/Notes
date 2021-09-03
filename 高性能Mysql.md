@@ -439,6 +439,77 @@ mysql有一个io后台线程，会在某个时间，随机把内存 buffer pool�
 
 undo log 是回滚段，当没有事务需要使用这个 undo log 来进行版本号数据查询时会被清理。
 
+
+
+#### 2.3 undo log
+
+在Innodb当中，INSERT操作在事务提交前只对当前事务可见，Undo log在事务提交后即会被删除，因为新插入的数据没有历史版本，所以无需维护insert的 Undo log。 (基本没有人会对刚插入的数据有可见性需求)
+
+而对于UPDATE、DELETE，则需要维护多版本信息。 在InnoDB当中，UPDATE和DELETE操作产生的Undo log都属于同一类型：update_undo。（update可以视为insert新数据到原位置，delete旧数据，undo log暂时保留旧数据）。
+
+
+
+Undo log指事务开始之前，在操作任何数据之前,首先将需操作的数据备份到一个地方 (Undo Log)。
+
+UndoLog是为了实现事务的原子性而出现的产物。
+
+
+
+**Undo Log实现了事务的原子性：**
+
+事务处理过程中如果出现了错误或者用户执行了 ROLLBACK语句，MySQL可以利用Undo Log中的备份将数据恢复到事务开始之前的状态。
+
+
+
+**MySQL InnoDB通过Undo log实现MVCC：**
+
+事务未提交之前，Undo log保存了未提交之前的版本数据，Undo log中的数据可作为数据旧版本快照供其他并发事务进行快照读。 
+
+
+
+<img src="高性能Mysql.assets/image-20210608142627754.png" alt="image-20210608142627754" style="zoom:50%;" />
+
+
+
+
+
+### 2.4 总结
+
+
+
+在InnoDB中，有三种日志跟事务的ACID关系都很大：
+
+1. **undo log负责原子性**，保护事务在exception或手动rollback时可以回滚到历史版本数据
+2. **redo log负责落盘式持久性**，保证事务提交后新的数据不会丢失
+3. **binlog负责副本式持久性**，可以将主节点上的数据复制到从节点，主节点crash后业务可以正常运转
+
+
+
+**undo log只关心过去，redo log只关心未来**
+
+
+
+
+
+
+
+
+
+作者：普通熊猫
+链接：https://www.zhihu.com/question/445644612/answer/1742967478
+来源：知乎
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+https://mp.weixin.qq.com/s/V-Calkc3rmhdkH581Qc7rA
+
+
+
+
+
+
+
+
+
 ### 3.事务
 
 事务就是要保证一组数据库操作，要么全部成功，要么全部失败。
@@ -455,7 +526,7 @@ ACID（Atomicity、Consistency、Isolation、Durability，即原子性、一致�
 
 * 读未提交:  一个事务还没提交时，它对数据的更改，就能被其他事务看到。
 * 读提交:  事务提交后，它做的更改才会被其他事务看到。
-* 可重复读: 事务执行过程中看到的数据，和这个事务启动时看到的数据一致。
+* 可重复读: 事务执行过程中看到的数据，和这个事务启动时看到的数据一致。 (mvcc)
 * 串行化: 写会加写锁，读会加读锁，出现冲突时，后访问的事务必须等前一个事务执行完成，才能继续执行
 
 
@@ -470,11 +541,18 @@ Mysql 数据库的默认隔离级别: 可重复读
 
 如何实现事务的隔离性:
 
-MVCC：多版本并发控制，通过undo log版本链和read-view实现事务隔离 （可重复读）
+**MVCC**：多版本并发控制，通过undo log版本链和read-view实现事务隔离 （可重复读）
+
+维持一个数据的多个版本，使得读写操作没有冲突，使用快照读具体实现mvcc。
+
+**作用：**
+
+* 并发读写数据库时，可以在读操作时不阻塞写操作，写操作时不阻塞读操作，提高并发读写性能
+* 解决了脏读、幻读、不可重复读等事务隔离问题，单不能解决更新丢失问题
+
+
 
 同一条记录在系统中可以存在多个版本，就是数据库的多版本并发控制（MVCC）
-
-
 
 假设一个值从 1 被按顺序改成了 2、3、4，在回滚日志里面就会有类似下面的记录。
 
@@ -737,8 +815,593 @@ InnorDB （辅助索引）二级索引的叶子节点存储的不是 “行指�
 
 
 
+####  4.2 索引建立原则
 
 
-建立索引的原则
 
-索引的使用
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 4.3 索引使用
+
+* 独立的列 作为索引的字段不能是表达式的一部分，也不能是函数的参数。要保持列的干净。
+
+  ```mysql
+  mysql> SELECT actor_id FROM sakila. actor WHERE actor_id+1=5;
+  ```
+
+  无法使用索引。
+
+* 最左匹配原则
+
+  ```mysql
+   SHOW INDEX FROM employees.titles;
+  ```
+
+  <img src="高性能Mysql.assets/image-20210528151503416.png" alt="image-20210528151503416" style="zoom:100%;" />
+
+主索引为<emp_no, title, from_date>
+
+   1. 全列匹配
+
+      ```mysql
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no='10001' AND title='Senior Engineer' AND from_date='1986-06-26';
+      
+      EXPLAIN SELECT * FROM employees.titles WHERE from_date='1986-06-26' AND emp_no='10001' AND title='Senior Engineer';
+      ```
+
+      按照索引中的列进行精确匹配，索引对列的顺序是敏感的，但是Mysql的查询优化器会自动调整子句的条件顺序以满足合适的索引。效果是一样的。
+
+​       ![image-20210528152225619](高性能Mysql.assets/image-20210528152225619.png)	
+
+2. 最左前缀匹配
+
+      ```mysql
+      # 用到了 emp_no 索引
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no='10001';
+      
+      # 用到了 <emp_no,title> 索引
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no='10001' AND title='Senior Engineer' ;
+      
+      # 中间的 title索引未提供 所以只用到了 emp_no索引
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no='10001' AND from_date='1986-06-26';
+      
+      
+      # 填坑 如果中间缺失的字段列值比较少，可以用in填充 这样就可以用到<emp_no,title,from_date>
+      EXPLAIN SELECT * FROM employees.titles
+      WHERE emp_no='10001'
+      AND title IN ('Senior Engineer', 'Staff', 'Engineer', 'Senior Staff', 'Assistant Engineer', 'Technique Leader', 'Manager')
+      AND from_date='1986-06-26';
+      
+      # 不指定第一列   无法使用索引
+      EXPLAIN SELECT * FROM employees.titles WHERE from_date='1986-06-26';
+      
+      # 使用 like  用到了 <emp_no,title>索引
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no='10001' AND title LIKE 'Senior%';
+      
+      # 范围查询 
+      # 范围列后面的列无法用到索引  只使用了 <emp_no> 索引
+      EXPLAIN SELECT * FROM employees.titles WHERE emp_no < '10010' and title='Senior Engineer';
+      
+      ```
+
+
+
+3. 前缀索引 
+
+   索引选择性(Selectivity)就是不重复的索引值 (Cardinality)与表记录数 （#T）的比值。 
+   
+    Index Selectivity = Cardinality / #T
+   
+   选择性越高的索引价值越大
+   
+   用这个索引选择性找到合适长度的前缀
+   
+   <img src="高性能Mysql.assets/image-20210529141409494.png" alt="image-20210529141409494" style="zoom:70%;" />
+
+ 找到合适的前缀长度，创建前缀索引
+
+<img src="高性能Mysql.assets/image-20210529141508181.png" alt="image-20210529141508181" style="zoom:67%;" />
+
+前缀索引可以让索引更小、更快。但是Mysql无法用前缀索引做 order by 和 group by，也无法使用前缀索引做覆盖扫描。
+
+使用场景: 存储网站会话(Session)时，需要在一个很长的十六进制字符串上建索引，此时如果用长度为8的前缀索引能显著提升性能。
+
+
+
+4. 多列索引
+
+     给每一个where后面的字段建索引是错误的，并不能显著提高mysql的性能。
+
+     虽然mysql5.0之后可以根据两个单列的索引进行查询再合并的操作，以前版本的直接扫描全表。
+
+     但是这是优化的结果，也说明索引建的很糟糕。
+
+
+
+当以下情况出现时可以用全列索引:
+
+* 查询有大量索引相交操作情况(多个and)
+
+* 查询有大量索引联合操作情况(多个or)   会消耗大量的cpu和内存资源在算法的缓存、排序和合并中，索引选择性不高时，更加严重。
+
+* 更重要的是，优化器只关心随机磁盘读取I/O,查询成本被低估，还不如全表扫描。
+
+  如果在 **EXPLAIN**中看到有索引合并:
+
+  * 看看是不是最优的
+  * 关闭参数 optimizer_switch 关闭索引的合并功能
+  * 使用 IGNORE_INDEX 让优化器忽略某些索引
+
+
+
+创建多列索引需要考虑顺序问题
+
+经验法则: 选择性高的列放前面 (不一定适用，不绝对)
+
+举例:
+
+```mysql
+SELECT * FROM payment WHERE staff_id = 2 AND customer_id = 584;
+```
+
+对于这个语句应该创建<staff_id , customer_id> 索引还是<customer_id , staff_id>？
+
+
+
+1. 看一下数据基数
+
+   <img src="高性能Mysql.assets/image-20210529151225088.png" alt="image-20210529151225088" style="zoom:67%;" />
+
+customer_id 基数少，优先考虑 customer_id 放前面，因为数量更小。
+
+
+
+2. 看一下选择性
+
+<img src="高性能Mysql.assets/image-20210529152025276.png" alt="image-20210529152025276" style="zoom:80%;" />
+
+customer_id 选择性更高，所以将其放前面更合适。
+
+```mysql
+ALTER TABLE payment ADD KEY(customer_id,staff_id)
+```
+
+
+
+但是建立索引不能但看某个查询，如果没有单个具体的查询那么还是按照经验法则来做。
+
+因为经验法则考虑的是全局基数和选择性。
+
+
+
+5. 覆盖索引
+
+   用索引直接获取列的数据，就不用再读取行数据了。就不需要回表了。
+
+   索引包含(覆盖)了查询需要的字段的值，这就是覆盖索引。
+
+
+
+当发起一个被索引覆盖的查询时 ，EXPLAIN的 Extra列可以看到 “Using index” 。
+
+
+
+举例
+
+表 sakila.inventory有一个多列索引（store_id,film_id）
+
+![image-20210529153704960](高性能Mysql.assets/image-20210529153704960.png)
+
+mysql 访问这两列，就可以使用这个索引做覆盖索引。
+
+
+
+> 联合索引的技巧：
+
+1、覆盖索引：如果查询条件使用的是普通索引（或是联合索引的最左原则字段），查询结果是联合索引的字段或是主键，不用回表操作，直接返回结果，减少IO磁盘读写读取正行数据
+2、最左前缀：联合索引的最左 N 个字段，也可以是字符串索引的最左 M 个字符
+3、联合索引：根据创建联合索引的顺序，以最左原则进行where检索，比如（age，name）以age=1 或 age= 1 and name=‘张三’可以使用索引，单以name=‘张三’ 不会使用索引，考虑到存储空间的问题，还请根据业务需求，将查找频繁的数据进行靠左创建索引。
+4、索引下推：like 'hello%’and age >10 检索，MySQL5.6版本之前，会对匹配的数据进行回表查询。5.6版本后，会先过滤掉age<10的数据，再进行回表查询，减少回表率，提升检索速度
+
+### 5.锁
+
+
+
+
+
+#### 5.1 全局锁
+
+全局锁就是对整个数据库实例加锁。MySQL 提供了一个加全局读锁的方法，命令是 Flush tables with read lock (FTWRL)。当你需要让整个库处于只读状态的时候，可以使用这个命令，之后其他线程的以下语句会被阻塞：数据更新语句（数据的增删改）、数据定义语句（包括建表、修改表结构等）和更新类事务的提交语句。
+
+全局锁的典型使用场景是，做**全库逻辑备份**。也就是把整库每个表都 select 出来存成文本。
+
+
+
+但是让整库都只读，听上去就很危险：
+
+* 如果你在主库上备份，那么在备份期间都不能执行更新，业务基本上就得停摆；
+
+* 如果你在从库上备份，那么备份期间从库不能执行主库同步过来的 binlog，会导致主从延迟。
+
+
+
+
+
+
+
+
+
+
+
+
+
+为了避免数据库备份时数据不一致。
+
+比如： 用户想买一门课，余额表的钱扣掉了，这时候开始备份，用户的课程表还没有加上课程。
+
+这时在这个备份中，用户花了钱，但是没有课程。
+
+
+
+所以如果不加锁的话，系统备份得到的库不是一个逻辑时间点。这个视图是逻辑不一致的。
+
+有一个方法可以拿到逻辑一致性视图: 可重复读隔离级别下开启一个事务。
+
+
+
+
+
+1. 所有的表使用事务引擎(innodb)的库备份 
+
+​	官方自带的逻辑备份工具是 mysqldump。当 mysqldump 使用参数–single-transaction 的时候，导数据之前就会启动一个事务，来确保拿到一致性视图。而由于 MVCC 的支持，这个过程中数据是可以正常更新的。
+
+
+
+2. 有的表使用了不支持事务的引擎 (myisam)
+
+   只能通过 FTWRL（Flush tables with read lock）执行这个语句让整个库处于只读状态。
+
+   把这个数据库锁住，只能读。
+
+
+
+所以 innordb 这种支持事务的数据库做逻辑备份时，只需要开启一个事务就行，期间还可以进行数据更新，但是 myisam这种不支持事务的数据库做逻辑备份的时候，需要加全局锁，避免数据逻辑不一致。
+
+全局锁主要用在逻辑备份过程中。对于全部是 InnoDB 引擎的库，我建议你选择使用–single-transaction 参数，对应用会更友好。
+
+
+
+#### 5.2 表级锁
+
+
+
+mysql 表锁有两种
+
+* 表锁
+* 元数据锁 (meta data lock  MDL)
+
+
+
+
+
+**表锁:**
+
+与 FTWRL 类似，可以用 unlock tables 主动释放锁，也可以在客户端断开的时候自动释放。
+
+ 
+
+举例:
+
+线程A 执行
+
+```mysql
+lock tables t1 read,t2 write;
+```
+
+
+
+线程A: 表t1 只能读，表t2 读写都可以 写t1 不被允许，更不能访问别的表
+
+其他线程 :   写t1被阻塞 读写t2被阻塞
+
+
+
+**元数据锁 MDL:**
+
+
+
+* 对一个表做增删改查操作的时候，加 MDL 读锁
+
+* 对表做结构变更操作的时候，加 MDL 写锁
+
+MDL 锁是系统默认会加的，但却是你不能忽略的一个机制。
+
+<img src="高性能Mysql.assets/7cf6a3bf90d72d1f0fc156ececdfb0ce.jpg" alt="7cf6a3bf90d72d1f0fc156ececdfb0ce" style="zoom:67%;" />
+
+
+
+sessionA先启动，对表t加一个MDL读锁, sessionB也需要 MDL读锁，所以可以正常执行。
+
+sessionC 需要MDL写锁，但是sessionA还在读，读锁没有释放，所以sessionC被阻塞。
+
+这时sessionD也被阻塞。会形成一个等待队列，队列中写锁优先级高于读锁。
+
+所有对表的增删改查都需要MDL读锁，现在都被阻塞，导致现在的表本来可以增删改查，现在完全不可以增删改查，整个表不可读了。
+
+如果某个表上的查询语句频繁，而且客户端有重试机制，也就是说超时后会再起一个新 session 再请求的话，这个库的线程很快就会爆满。
+
+所以对表结构的更改在高并发下需要非常小心。
+
+> 线上如何安全的给表加字段？
+
+修改表的字段时，mdl元数据写锁会进入队列，mdl读锁就会被阻塞，对表的增删改查都需要mdl读锁，此时现在无法增删改查。
+
+* **解决长事务**，事务不提交一直占着MDL锁。
+
+  在MySQL的information_schema库的innodb_trx表中，可以查到当前执行的事务。如果要做DDL变更的表刚好有长事务在执行，要考虑先暂停DDL，或者kill掉这个长事务
+
+* 如果你要变更的表是一个热点表，虽然数据量不大，但是上面的请求很频繁，kill 可能未必管用，因为新的请求马上就来了。
+
+  比较理想的机制是，在 alter table 语句里面**设定等待时间**，如果在这个指定的等待时间里面能够拿到 MDL 写锁最好，拿不到也不要阻塞后面的业务语句，先放弃。之后开发人员或者 DBA 再通过重试命令重复这个过程。
+
+  MariaDB 已经合并了 AliSQL 的这个功能，所以这两个开源分支目前都支持 DDL NOWAIT/WAIT n 这个语法。
+
+  ```sql
+  
+  ALTER TABLE tbl_name NOWAIT add column ...
+  ALTER TABLE tbl_name WAIT N add column ... 
+  ```
+
+  
+
+详细解析: https://blog.csdn.net/q2878948/article/details/96430129
+
+
+
+tips: 
+
+​	表锁一般是在数据库引擎不支持行锁时用到，如果应用程序里有 lock tables 这样的语句。
+
+* 系统还在用 myisam这种不支持事务的引擎，安排升级引擎
+
+* 引擎升级了，但是代码没升级。业务开发需要把 lock tables 和 unlock tables 改为 begin commit
+
+  因为原本需要用到表锁的场景可以直接用事务代替，事务自动添加mdl锁，可以区别对待表结构的修改和普通增删改查，粒度更细。
+
+* MDL 会直到事务提交才释放，在做表结构变更的时候，你一定要小心不要导致锁住线上查询和更新。
+
+
+
+
+
+> 当备库用–single-transaction 做逻辑备份的时候，如果从主库的 binlog 传来一个 DDL 语句会怎么样？
+
+假设这个ddl 是想要该表表t1的结构。
+
+备份中的关键语句:
+
+```mysql
+
+Q1:SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+Q2:START TRANSACTION  WITH CONSISTENT SNAPSHOT；
+/* other tables */
+Q3:SAVEPOINT sp;
+/* 时刻 1 */
+Q4:show create table `t1`;
+/* 时刻 2 */
+Q5:SELECT * FROM `t1`;
+/* 时刻 3 */
+Q6:ROLLBACK TO SAVEPOINT sp;
+/* 时刻 4 */
+/* other tables */
+```
+
+* 备份开始的时候，为了确保 RR（可重复读）隔离级别，再设置一次 RR 隔离级别 (Q1);
+* 启动事务，这里用 WITH CONSISTENT SNAPSHOT 确保这个语句执行完就可以得到一个一致性视图（Q2)；
+* 设置一个保存点，这个很重要 (Q6之后还需要备份其他表。备份期间会占用DML读锁，设置回滚点，读完数据后，回滚释放锁。将锁的占用时间控制到最短。) 
+* show create 是为了拿到表结构 (Q4)，然后正式导数据 （Q5），回滚到 SAVEPOINT sp，在这里的作用是释放 t1 的 MDL 锁 （Q6）。
+
+DDL 从主库传过来的时间按照效果不同，我打了四个时刻。题目设定为小表，我们假定到达后，如果开始执行，则很快能够执行完成。
+
+
+
+答案:
+
+1. Q4 语句执行之前到达，现象：没有影响，备份拿到的是 DDL 后的表结构。
+2. 如果在“时刻 2”到达，则表结构被改过，Q5 执行的时候，报 Table definition has changed, please retry transaction，现象：mysqldump 终止；
+3. 如果在“时刻 2”和“时刻 3”之间到达，mysqldump 占着 t1 的 MDL 读锁，binlog 被阻塞，现象：主从延迟，直到 Q6 执行完成。
+4. 从“时刻 4”开始，mysqldump 释放了 MDL 读锁，现象：没有影响，备份拿到的是 DDL 前的表结构。
+
+
+
+#### 5.3 行级锁
+
+
+
+
+
+两阶段锁协议:
+
+innoDB事务中，行锁在 事务begin时加上，commit之后才释放。
+
+所以如果事务中需要锁多个行时，把最可能造成锁冲突，最可能影响并发度的锁往后放。
+
+
+
+
+
+#### 5.4 MVCC
+
+
+
+
+
+
+
+
+
+![image-20210615140752695](高性能Mysql.assets/image-20210615140752695.png)
+
+
+
+事务 B 查到的 k 的值是 3，而事务 A 查到的 k 的值是 1。
+
+原因: 
+
+事务B在执行Update的时候需要先读取，而且这次读取是当前读，读取当前数据库最新的数据内容，进行更改。
+
+所以B读到已经被c更改过的数据为2，再自己更新。
+
+事务开始前会创建一个一致性视图，在事务执行过程中，所有其他未提交或者已经提交的事务，对当前已经开启的事务不可见。 但是在更新数据的时候，会执行当前读。
+
+所以A查到的还是1。
+
+
+
+在 MySQL 里，有两个“视图”的概念：
+
+* 一个是 view。它是一个用查询语句定义的虚拟表，在调用的时候执行查询语句并生成结果。创建视图的语法是 create view … ，而它的查询方法与表一样。
+* 另一个是 InnoDB 在实现 MVCC 时用到的一致性读视图，即 consistent read view，用于支持 RC（Read Committed，读提交）和 RR（Repeatable Read，可重复读）隔离级别的实现。
+
+
+
+**mvcc如何决定数据可见和不可见？**
+
+
+
+InnoDB 里面每个事务有一个唯一的事务 ID，叫作 transaction id。它是在事务开始的时候向 InnoDB 的事务系统申请的，是按申请顺序严格递增的。
+
+每行数据都是有多个版本的，每次事务更新数据时，都会生成一个新的数据版本，把这个事务的id作为这个数据版本的事务id。记为 row trx_id。
+
+
+
+一个记录被多个事务联系更新后的状态图
+
+
+
+<img src="高性能Mysql.assets/68d08d277a6f7926a41cc5541d3dfced.png" alt="68d08d277a6f7926a41cc5541d3dfced" style="zoom:67%;" />
+
+
+
+语句更新会生成 undo log ，三个虚线箭头就是 undo log。
+
+v1、v2、v3 并不真实存在，通过v4当前版本和undo log 进行计算得到。
+
+
+
+在可重复读隔离级别下，当前事务启动后，它能看见之前提交的事务的结果，之后事务提交的它不可见。
+
+用mvcc数据多版本就可以实现这种效果。
+
+事务在启动时声明: 以我启动的时刻为准(事务id)，如果一个数据版本在我启动之前生成的，，那我可以看到你；如果是我启动以后生成的新数据，那我必须要找到你最近的在我之前生成的数据的版本。
+
+
+
+那么该如何实现，如何判定可见不可见，有可能新数据版本id比当前事务大，但是却早早更新完了，早已提交了，而当前事务执行慢，现在应该也需要看到这个id大于自己版本的数据？
+
+
+
+**数据版本可见性规则:**
+
+innoDB 为每个事务构造了一个数组，来保存事务启动瞬间，活跃的事务id(启动了但还没提交)。
+
+数组其实就只有黄色这一部分。
+
+<img src="高性能Mysql.assets/882114aaf55861832b4270d44507695e.png" alt="882114aaf55861832b4270d44507695e" style="zoom:80%;" />
+
+低水位: 启动了但还没提交事务的最小id
+
+高水位: 当前系统内的最大事务id  (当前系统: 当前在执行的事务)
+
+
+
+对于当前事务的启动瞬间来说，一个数据版本的 row trx_id，有以下几种可能：
+
+1. 如果落在绿色部分，表示这个版本是已提交的事务或者是当前事务自己生成的，这个数据是可见的；
+
+2. 如果落在红色部分，表示这个版本是由将来启动的事务生成的，是肯定不可见的；
+
+3. 如果落在黄色部分，那就包括两种情况
+
+   a. 若 row trx_id 在数组中，表示这个版本是由还没提交的事务生成的，不可见；
+
+   b. 若 row trx_id 不在数组中，表示这个版本是已经提交了的事务生成的，可见。
+
+   
+
+
+
+![mvcc](高性能Mysql.assets/mvcc.png)
+
+
+
+根据上面的规则:
+
+1 2 3 已经提交，可见。
+
+4 5 8 9 已经开始，还未提交，在数组中，不可见。
+
+7 已经提交，不在数组中，可见。
+
+10 11 12  还没开始。不可见。
+
+
+
+InnoDB 利用了“所有数据都有多个版本”的这个特性，实现了“秒级创建快照”的能力。
+
+更新数据都是先读后写的，而这个读，只能读当前的值，称为“当前读”（current read）。
+
+其实，除了 update 语句外，select 语句如果加锁，也是当前读。
+
+如果把事务 A 的查询语句 select * from t where id=1 修改一下，加上 lock in share mode 或 for update，也都可以读到版本号最新的数据，返回的 k 的值是 3。
+
+下面这两个 select 语句，就是分别加了读锁（S 锁，共享锁）和写锁（X 锁，排他锁）。
+
+```sql
+
+mysql> select k from t where id=1 lock in share mode;
+mysql> select k from t where id=1 for update;
+```
+
+
+
+  
+
+c 变成事务，且在之后提交。
+
+<img src="高性能Mysql.assets/cda2a0d7decb61e59dddc83ac51efb6e.png" alt="cda2a0d7decb61e59dddc83ac51efb6e" style="zoom:80%;" />c
+
+
+
+在它提交前，事务 B 的更新语句先发起了。虽然事务 C’还没提交，但是 (1,2) 这个版本也已经生成了，并且是当前的最新版本。
+
+那么，事务 B 的更新语句会怎么处理呢？
+
+这时候，我们在上一篇文章中提到的“**两阶段锁协议**”就要上场了。事务 C’没提交，也就是说 (1,2) 这个版本上的写锁还没释放。而事务 B 是当前读，必须要读最新版本，而且必须加锁，因此就被锁住了，必须等到事务 C’释放这个锁，才能继续它的当前读。
+
+到这里，我们把一致性读、当前读和行锁就串起来了。
+
+
+
+**事务的可重复读的能力是怎么实现的？**
+
+可重复读的核心就是一致性读（consistent read）；而事务更新数据的时候，只能用当前读。如果当前的记录的行锁被其他事务占用的话，就需要进入锁等待。
+
+而读提交的逻辑和可重复读的逻辑类似，它们最主要的区别是：
+
+* 在可重复读隔离级别下，只需要在事务开始的时候创建一致性视图，之后事务里的其他查询都共用这个一致性视图；
+
+* 在读提交隔离级别下，每一个语句执行前都会重新算出一个新的视图。
+

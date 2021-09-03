@@ -3567,6 +3567,24 @@ redis-sentinel cqpconfig/sentinel.conf
 
 
 
+### 15.docker操作redis
+
+![image-20210630103631545](Redis 学习笔记.assets/image-20210630103631545.png)
+
+
+
+​      Redis-Springboot提供了 redistemplate<Object,Object> 和 stringRedisTemplate<String,String> 供使用。
+
+​		redisTemplate自动序列化对象，StringRedisTempalte 只能传字符串。
+
+![image-20210630104146681](Redis 学习笔记.assets/image-20210630104146681.png)
+
+​		如果需要使用 stringRedistemplate存储对象可以使用 jackson 的 ObjectMapper 把对象转成String，接收的时候再用		ObjectMapper转一下。
+
+
+
+
+
 
 
 
@@ -3574,12 +3592,6 @@ redis-sentinel cqpconfig/sentinel.conf
 
 
 学习资料:https://www.bilibili.com/video/BV1S54y1R7SB?p=36
-
-
-
-
-
-
 
 ### 扩展(阿里云服务器)
 
@@ -3668,12 +3680,6 @@ scl enable devtoolset-7 bash
 
 
 三.远程阿里云无法连接的问题： 只需要把配置文件里的bind 127.0.0.1 改为 bind 0.0.0.0即可。亲测有效。
-
-
-
-
-
-
 
 
 

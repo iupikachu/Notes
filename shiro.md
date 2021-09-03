@@ -127,7 +127,9 @@ json web token 是一个开放标准，用于在各方之间以json对象安全�
 
 
 
-   
+### 
+
+
 
 ![image-20210106210925894](shiro.assets/image-20210106210925894.png)
 
@@ -135,7 +137,34 @@ json web token 是一个开放标准，用于在各方之间以json对象安全�
 
 
 
-### 1.3 JWT 的组成
+
+
+### 1.3 Token的优点
+
+1. 无状态
+
+   token存储在客户端，完全无状态。
+
+2. 可扩展
+
+   负载均衡器可以将用户传递到任意服务器，因为在任意地方都没有状态或会话信息。
+
+3. 安全
+
+   Token不是cookie，有助于防止CSRF (跨站请求伪造) 攻击
+
+
+
+JWT 与 Oauth2的区别
+
+* OAuth2是一种授权框架
+* JWT是一种认证协议
+
+OAuth2用在使用第三方账号登录的情况(比如使用weibo, qq, github登录某个app)，而JWT是用在前后端分离, 需要简单的对后台API进行保护时使用。
+
+
+
+### 1.4 JWT 的组成
 
 
 
@@ -151,7 +180,7 @@ json web token 是一个开放标准，用于在各方之间以json对象安全�
 
  
 
-### 1.4 使用JWT
+### 1.5 使用JWT
 
 
 
@@ -264,11 +293,11 @@ public static DecodedJWT getTokenInfo(String token){
 
 
 
-### 1.5 springboot 整合 JWT
+### 1.6 springboot 整合 JWT
 
 ![image-20210107163249438](shiro.assets/image-20210107163249438.png)
 
-#### 1.5.1 测试
+#### 1.6.1 测试
 
 ```xml
 <!-- 引入jwt-->
@@ -388,7 +417,7 @@ public class UserController {
 
 把 jwt 放在请求头中
 
-#### 1.5.2 拦截器
+#### 1.6.2 拦截器
 
 ```java
 package com.cqp.swagger.interceptors;

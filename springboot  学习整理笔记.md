@@ -1,5 +1,9 @@
 
 
+
+
+
+
 ## springboot  学习整理笔记
 
 ### 1.默认的主启动类 （自动配置初理解）
@@ -1967,4 +1971,2279 @@ public Docket docket(){
 ### 10.注意事项
 
 **@RequestBody只支持POST请求，GET请求不能使用@RequestBody，修改GET请求为POST即可，如果需要使用GET请求，可以使用@RequestParam和@PathVariable**
+
+
+
+
+
+### 11.常用注解解析
+
+
+
+#### 11.1 @Configuration
+
+
+
+前置知识:https://cloud.tencent.com/developer/article/1751910
+
+
+
+spring在启动时会默认加载一些 postProcessor 后置处理器。
+
+ConfigurationClassPostProcessor 专门处理带有@Configuration注解的类。
+
+```java
+public void enhanceConfigurationClasses(ConfigurableListableBeanFactory beanFactory)
+```
+
+处理器其中的enhanceConfigurationClasses方法来处理。
+
+第一个for循环读取所有带 @Configuration注解的类。
+
+第二个for循环对类进行增强代理。用代理类去替换原来带注解的类。
+
+
+
+@configuration 注解下的 带了@bean注解的类执行方法时，也会被拦截做处理。(Callback 里的 BeanMethodInterceptor)
+
+**拦截了做什么?**
+
+
+
+<img src="springboot  学习整理笔记.assets/image-20210617143229412.png" alt="image-20210617143229412" style="zoom:50%;" />
+
+
+
+一开始会创建 author 这个bean注入容器中。
+
+然后创建book这个bean，由于里面调用了author，被拦截发现已经创建了author这个bean了，直接返回之前创建的 author，而不用重复创建。
+
+所以@configuration中的 bean是单例的。
+
+
+
+#### 11.2 @springbootApplication
+
+
+
+启动类
+
+![image-20210617144615205](springboot  学习整理笔记.assets/image-20210617144615205.png)
+
+* @SpringbootConfiguration 和 @Comfiguration没什么区别
+* @EnableAutoConfiguration 开启自动化配置
+
+​        最关键的是其中导入两个配置类
+
+​		<img src="springboot  学习整理笔记.assets/image-20210617153246442.png" alt="image-20210617153246442" style="zoom:50%;" />
+
+​	AutoConfigurationImportSelector.class : 导入自动化配置类，从spring.factories文件去加载。
+
+​    
+
+​	还有一个是@AutoConfigurationPackage 里面的 AutoConfigurationPackages.Registrar.class
+
+![image-20210617153552814](springboot  学习整理笔记.assets/image-20210617153552814.png)
+
+
+
+
+
+
+
+
+
+
+
+* @componentScan 扫描当前包下，所以启动类要放到根包下，不然扫不到
+
+![image-20210617154112934](springboot  学习整理笔记.assets/image-20210617154112934.png)
+
+
+
+@Filter 除去两个
+
+1. 自定义类 给一个自定义的空间，只要去实现 TypeExcludeFilter.class就可以了
+2. 自动配置类，因为前面的@EnableAutoConfiguration已经导入了相应的bean了，不用扫了，前面已经处理过了。
+
+
+
+
+
+
+
+#### 11.3 @import
+
+参考资料: https://blog.csdn.net/mamamalululu00000000/article/details/86711079
+
+
+
+@Import注解是用来导入配置类或者一些需要前置加载的类
+
+
+
+在原生的 Spring Framework 中，bean(组件)装配有三个阶段:
+
+1. spring 2.5+ @component 注解装配
+2. spring3.0+ 使用 @Configuration + @Bean 装配
+3. spring3.1+ @EnableXXX + @import
+
+
+
+```java
+public class Apple {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+
+
+```java
+public class Banana {
+    private String name;
+    public String getName() {
+
+        return name;
+
+    }
+   public void setName(String name) {
+        this.name = name;
+    }
+
+}
+```
+
+
+
+```java
+@Retention(RetentionPolicy.RUNTIME)
+
+@Target(ElementType.TYPE)
+
+@Import({Apple.class, Banana.class})
+@Import({FruitImportDefinitionRegistar.class})
+
+public @interface EnableFruit {
+}
+```
+
+
+
+在启动类上加 @EnableFruit，项目启动后，Apple和Banana被注入到容器中了。
+
+一共有四种注入方式，上面是最简单的第一种。
+
+
+
+
+
+#### 11.4 @Autowired 和 @Resource
+
+
+
+假设有两个类型一样的bean 
+
+例如 JdbcTemplate类    jdbcTemplateOne 和 jdbcTemplateTwo
+
+ 用@Autowired 就区分不出来了
+
+两种方法注入：@Autowired + @Qualifier    |        @Resource(name="xxxxxx")
+
+```java
+
+@Autowired
+@Qualifier("jdbcTemplateOne")
+JdbcTemplate jdbcTemplateOne;
+
+@Resource(name = "jdbctemplateTwo")
+JdbcTemplate jdbcTemplateTwo;
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 12.maven 工程依赖 (parent)
+
+
+
+<parent> 里面如果包含了models，那么会把包含的models一起打包，并且子模块无法单独打包成功，只能父模块打包。父模块打包会把子模块和整个项目都打包。
+
+例子: vhr打包可以  vhr-web/vhr-model打包失败
+
+![image-20210703170735382](springboot  学习整理笔记.assets/image-20210703170735382.png)
+
+```xml
+   <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.5.1</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+```
+
+parent的作用:
+
+* 定义java的编译版本
+* 定义项目编码格式
+* 定义依赖的版本号
+* 项目打包配置
+* 自动化资源过滤 (application.properties yaml 文件中定义属性的话自动过滤，类似resource节点)
+* 自动化插件配置
+
+
+
+如果需要继承公司的parent，可以让公司的parent继承springboot的parent，如果比较老，继承不了的话，可以在项目里用<dependencyManagement>
+
+这样在使用依赖的时候就不用添加版本号
+
+
+
+
+
+
+
+一文搞懂pom.xml文件中dependencyManagement和properties标签的作用
+
+https://blog.csdn.net/weixin_43190860/article/details/94460675
+
+
+
+
+
+
+
+### 13.tomcat 配置
+
+
+
+#### 13.1 禁止内置tomcat启动，可以更换为别的容器。
+
+```xml
+<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+<!--            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-tomcat</artifactId>
+                </exclusion>
+            </exclusions>-->
+        </dependency>
+
+<!--        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-undertow</artifactId>
+        </dependency>-->
+```
+
+
+
+#### 13.2 tomcat 日志分为两种类型
+
+
+
+* accesslog 访问日志
+* 服务器内部
+
+
+
+```xml
+# 生成的访问日志将在该目录下
+server.tomcat.basedir=my-tomcat
+# 开启访问日志，默认的日志位置在项目运行的临时目录中，默认生成的日志格式 access_log.2020-12-10.log
+server.tomcat.accesslog.enabled=true
+# 生成日志文件名的前缀，默认是 access_log
+server.tomcat.accesslog.prefix=javaboy_log
+# 生成的日志文件后缀
+server.tomcat.accesslog.suffix=.log
+# 日志文件名中的日期格式
+server.tomcat.accesslog.file-date-format=.yyyyMMdd
+
+# 生成的日志文件内容格式也是可以调整的
+# %h 请求的客户端 IP
+# %l 用户的身份
+# %u 用户名
+# %t 请求时间
+# %r 请求地址
+# %s 响应的状态码
+# %b 响应的大小
+server.tomcat.accesslog.pattern=%h %l %u %t \"%r\" %s %b
+
+# 服务器内部日志开启
+
+logging.level.org.apache.tomcat=debug
+logging.level.org.apache.catalina=debug
+```
+
+![image-20210618110820594](springboot  学习整理笔记.assets/image-20210618110820594.png)
+
+
+
+###  14.属性注入
+
+
+
+####  14.1 普通属性注入(pdf)
+
+####  14.2 安全属性注入(pdf)
+
+
+
+####  14.3 配置文件中引用maven配置
+
+
+
+application.properties文件
+
+```properties
+bb.name = javaboy
+aa.name = ${bb.name}
+```
+
+这时候不会properties里面引用的是 javaboy不会去找maven中的 bb.name。和maven引用冲突了。
+
+
+
+要用@xxx@来引用
+
+```properties
+app.encoding = @project.build.sourceEncoding@
+app.java.version = @java.version@
+```
+
+
+
+打包之后，目标文件中的 application.properties就引用了maven中的配置参数
+
+![image-20210618194111391](springboot  学习整理笔记.assets/image-20210618194111391.png)
+
+
+
+自定义这个符号：在pom.xml中
+
+```xml
+<properties>
+		<java.version>1.8</java.version>
+    <resource.delimiter>#</resource.delimiter>
+</properties>
+```
+
+```properties
+app.encoding = #project.build.sourceEncoding#
+app.java.version = #java.version#
+```
+
+结果一样，可以读取pom.xml的配置
+
+
+
+
+
+思考: 如果这些配置写在book.properties中会读取到maven的配置吗?
+
+```properties
+app.encoding = #project.build.sourceEncoding#
+app.java.version = #java.version#
+```
+
+
+
+不会，因为在pom.xml中没有配置过滤，springboot默认对application.properties过滤，如果要生效的话需要在pom.xml中给book.properties配置过滤filter。
+
+
+
+
+
+14.4  命令行启动jar
+
+![image-20210618195400669](springboot  学习整理笔记.assets/image-20210618195400669.png)
+
+
+
+设置启动的默认端口值
+
+```properties
+server.port=${port:8888}$
+```
+
+
+
+
+
+
+
+#### 14.4 yaml
+
+
+
+属性注入
+
+![image-20210618204615266](springboot  学习整理笔记.assets/image-20210618204615266.png)
+
+
+
+![image-20210618204642847](springboot  学习整理笔记.assets/image-20210618204642847.png)
+
+
+
+
+
+注入
+
+![image-20210618204712423](springboot  学习整理笔记.assets/image-20210618204712423.png)
+
+
+
+运行结果:
+
+<img src="springboot  学习整理笔记.assets/image-20210618204730752.png" alt="image-20210618204730752" style="zoom:50%;" />
+
+
+
+
+
+
+
+添加作者
+
+![image-20210618205154023](springboot  学习整理笔记.assets/image-20210618205154023.png)
+
+![image-20210618205122907](springboot  学习整理笔记.assets/image-20210618205122907.png)
+
+
+
+![image-20210618205234426](springboot  学习整理笔记.assets/image-20210618205234426.png)
+
+
+
+#### 14.5 profile
+
+![image-20210618211036475](springboot  学习整理笔记.assets/image-20210618211036475.png)
+
+使用prod的配置
+
+
+
+
+
+### 15.springboot 日志
+
+
+
+https://mp.weixin.qq.com/s/kkp2PTC3rbmHlXHnF95FLw
+
+
+
+搜索一下日志springboot启动时打印日志的代码
+
+<img src="springboot  学习整理笔记.assets/image-20210618212826482.png" alt="image-20210618212826482" style="zoom:100%;" />
+
+
+
+
+
+
+
+springboot 默认自带的是logback 日志实现。
+
+可以在application.properties中对日志进行配置。不过在application.properties中只能实现简单的配置，如果要实现更加细粒度的日志配置，就需要使用日志实现的原生配置。
+
+例如:
+
+* Logback 的 classpath:logback.xml
+* Log4j 的 classpath:log4j.xml
+
+​	
+
+配置log4j2日志
+
+默认情况下 classpath 下当然不存在 `Log4j2` 的依赖，如果想使用 `Log4j2`，可以排除已有的 `Logback`，然后再引入 `Log4j2`
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-log4j2</artifactId>
+</dependency>
+```
+
+
+
+`Log4j2` 的配置就比较容易了，在 reources 目录下新建 log4j2.xml 文件，内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="warn">
+    <properties>
+        <Property name="app_name">logging</Property>
+        <Property name="log_path">logs/${app_name}</Property>
+    </properties>
+    <appenders>
+        <console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%d][%t][%p][%l] %m%n" />
+        </console>
+        <RollingFile name="RollingFileInfo" fileName="${log_path}/info.log"
+                     filePattern="${log_path}/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log.gz">
+            <Filters>
+                <ThresholdFilter level="INFO" />
+                <ThresholdFilter level="WARN" onMatch="DENY"
+                                 onMismatch="NEUTRAL" />
+            </Filters>
+            <PatternLayout pattern="[%d][%t][%p][%c:%L] %m%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="2 MB" />
+            </Policies>
+            <DefaultRolloverStrategy compressionLevel="0" max="10"/>
+        </RollingFile>
+        <RollingFile name="RollingFileWarn" fileName="${log_path}/warn.log"
+                     filePattern="${log_path}/$${date:yyyy-MM}/warn-%d{yyyy-MM-dd}-%i.log.gz">
+            <Filters>
+                <ThresholdFilter level="WARN" />
+                <ThresholdFilter level="ERROR" onMatch="DENY"
+                                 onMismatch="NEUTRAL" />
+            </Filters>
+            <PatternLayout pattern="[%d][%t][%p][%c:%L] %m%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="2 MB" />
+            </Policies>
+            <DefaultRolloverStrategy compressionLevel="0" max="10"/>
+        </RollingFile>
+
+        <RollingFile name="RollingFileError" fileName="${log_path}/error.log"
+                     filePattern="${log_path}/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log.gz">
+            <ThresholdFilter level="ERROR" />
+            <PatternLayout pattern="[%d][%t][%p][%c:%L] %m%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true" />
+                <SizeBasedTriggeringPolicy size="2 MB" />
+            </Policies>
+            <DefaultRolloverStrategy compressionLevel="0" max="10"/>
+        </RollingFile>
+    </appenders>
+    <loggers>
+        <root level="info">
+            <appender-ref ref="Console" />
+            <appender-ref ref="RollingFileInfo" />
+            <appender-ref ref="RollingFileWarn" />
+            <appender-ref ref="RollingFileError" />
+        </root>
+    </loggers>
+</configuration>
+```
+
+
+
+
+
+
+
+https://thinkwon.blog.csdn.net/article/details/101627162
+
+Filters决定日志事件能否被输出。过滤条件有三个值：`ACCEPT(接受)`，`DENY(拒绝)`，`NEUTRAL(中立)`。
+
+ThresholdFilter
+
+输出warn级别一下的日志
+
+```xml
+<Filters>
+    <!--如果是error级别拒绝，设置 onMismatch="NEUTRAL" 可以让日志经过后续的过滤器-->
+    <ThresholdFilter level="error" onMatch="DENY" onMismatch="NEUTRAL"/>
+    <!--如果是debug\info\warn级别的日志输出-->
+    <ThresholdFilter level="debug" onMatch="ACCEPT" onMismatch="DENY"/>
+</Filters>
+```
+
+
+
+只输出error级别以上的日志
+
+```xml
+<Filters>
+    <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+</Filters>
+```
+
+
+
+TimeFilter
+
+时间过滤器可用于将过滤器限制为仅当天的某个部分。
+
+```xml
+<Filters>
+    <!-- 只允许在每天的 8点~8点半 之间输出日志 -->
+    <TimeFilter start="08:00:00" end="08:30:00" onMatch="ACCEPT" onMismatch="DENY" />
+</Filters>
+```
+
+
+
+
+
+
+
+
+
+
+
+### 16.json框架
+
+
+
+Json三大主流框架
+
+* jackson
+* gson
+* fastjson
+
+springmvc框架中，jackson 和 gson 已经自动配置好了。只要引入依赖，不用任何配置，服务端自动返回json。
+
+fastjson需要依赖+手动配置
+
+
+
+序列化 : 对象-> json (响应json)
+反序列化: json -> 对象  （请求参数是json）
+
+
+
+**HttpMessageConverter** 
+
+所有的json工具都会提供各自的 HttpMessageConverter
+
+
+
+-jackson:  MappingJackson2HttpMessageConverter
+
+-gson:  GsonHttpMessageConverter
+
+-fastjson:
+
+转换器: 对象 -> json  json -> 对象
+
+
+
+
+
+
+
+#### 16.1 jackson配置
+
+两种方式:
+
+1. 在对象上配置
+2. 全局配置
+
+
+
+```java
+public class User {
+    // 指定属性序列化/反序列化时的名称、默认名称就是属性名
+    @JsonProperty(value = "aaage",index = 99)
+    private Integer age;
+    @JsonProperty(index = 98)
+    private String username;
+    @JsonProperty(index = 97)
+    private Date birthday;
+    @JsonProperty(index = 96)
+    private String address;
+```
+
+
+
+```java
+@RestController
+public class UserController {
+    @GetMapping("/user")
+    public User getUserById(){
+        User user = new User();
+        user.setUsername("cqp");
+        user.setBirthday(new Date());
+        user.setAddress("com.cqp.java");
+        user.setAge(24);
+        return user;
+    }
+
+    /**
+     * 反序列化
+     * 默认是按照 key value
+     * 加 @RequestBody 就是把参数以json字符串传递了
+     * @param user
+     */
+    @PostMapping("/user")
+    public void addUser(@RequestBody User user){
+        System.out.println(user.toString());
+    }
+}
+```
+
+
+
+
+
+没有@JsonProperty时
+
+<img src="springboot  学习整理笔记.assets/image-20210619142618961.png" alt="image-20210619142618961" style="zoom:50%;" />
+
+
+
+加上@JsonProperty时
+
+<img src="springboot  学习整理笔记.assets/image-20210619142644012.png" alt="image-20210619142644012" style="zoom:50%;" />
+
+
+
+测试反序列化
+
+<img src="springboot  学习整理笔记.assets/image-20210619142707130.png" alt="image-20210619142707130" style="zoom:67%;" />
+
+![image-20210619142722721](springboot  学习整理笔记.assets/image-20210619142722721.png)
+
+
+
+
+
+
+
+@JsonIgnore
+
+```java
+// 序列化、反序列化时忽略的字段
+@JsonIgnore
+private String address;
+```
+
+
+
+
+
+@JsonIgnoreProperties
+
+```java
+// 批量忽略字段
+@JsonIgnoreProperties({"birthday","address"})
+public class User {
+```
+
+
+
+@JsonFormat 日期格式 注意时区问题
+
+```java
+ @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss",timezone = "Asia/Shanghai") 
+    private Date birthday;
+```
+
+
+
+以上都是手动局部配置，如何全局简化。
+
+![image-20210619144541252](springboot  学习整理笔记.assets/image-20210619144541252.png)
+
+![image-20210619144555060](springboot  学习整理笔记.assets/image-20210619144555060.png)
+
+JacksonAutoConfiguration 如果我们没有自己手动往容器注册一个 ObjectMapper，那他会自动帮我们注册一个默认的ObjectMapper。
+
+
+
+
+
+
+
+#### 16.2 Gson配置
+
+
+
+先排除 jackson依赖
+
+![image-20210619144901315](springboot  学习整理笔记.assets/image-20210619144901315.png)
+
+
+
+
+
+
+
+再加上 Gson依赖
+
+![image-20210619144958780](springboot  学习整理笔记.assets/image-20210619144958780.png)
+
+
+
+
+
+
+
+
+
+### 17.静态资源
+
+
+
+
+
+![image-20210619161102998](springboot  学习整理笔记.assets/image-20210619161102998.png)
+
+![image-20210619161120734](springboot  学习整理笔记.assets/image-20210619161120734.png)
+
+![image-20210619161138502](springboot  学习整理笔记.assets/image-20210619161138502.png)
+
+
+
+
+
+等价于
+
+![image-20210619161727119](springboot  学习整理笔记.assets/image-20210619161727119.png)
+
+而且参数为可变长度，可以配置多个。
+
+
+
+
+
+
+
+
+
+### 18.文件上传
+
+
+
+上传的文件可以放在
+
+* 项目临时目录 (重启项目后，临时目录就丢失了)
+* 放到固定位置，把path写死  （系统任意一个盘符下面）
+* 自己搭建fastdfs上传服务 
+* 云服务 obs对象存储服务 (调api 自动备份)
+
+
+
+
+
+
+
+
+
+
+
+#### 18.1 单文件上传
+
+注意前端中的name="file" 与后端参数的MultipartFile file需要一致
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="上传">
+    </form>
+
+</body>
+</html>
+```
+
+
+
+```java
+package com.cqp.demo4springboot.fileupload;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.UUID;
+
+/**
+ * @author cqp
+ * @version 1.0.0
+ * @ClassName FileUploadController.java
+ * @Description 文件上传
+ * @createTime 2021年06月21日 13:58:00
+ */
+
+@RestController
+public class FileUploadController {
+    SimpleDateFormat sdf = new SimpleDateFormat("/yyyy/MM/dd/");
+    @PostMapping("/upload")
+    public String upload(MultipartFile file, HttpServletRequest req){
+        // 临时目录
+        String realPath = req.getServletContext().getRealPath("/");
+        String format = sdf.format(new Date());
+        String path = realPath + format;
+        File folder = new File(path);
+        if(!folder.exists()){
+            folder.mkdirs();
+        }
+        String oldName = file.getOriginalFilename();
+        System.out.println("oldName:"+oldName);
+        String newName = UUID.randomUUID().toString() + oldName.substring(oldName.lastIndexOf("."));
+        System.out.println("newName:"+newName);
+        try{
+            // 给定文件路径和名称，写入到磁盘上
+            file.transferTo(new File(folder,newName));
+            // 生成文件访问路径 由于部署时才能决定是 http 还是 https 所以不能写死
+            // 动态获取 拼接url
+            String s = req.getScheme() + "://" + req.getServerName() + ":" + req.getServerPort() + format + newName;
+            return s;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+}
+
+```
+
+
+
+
+
+<img src="springboot  学习整理笔记.assets/image-20210621150615888.png" alt="image-20210621150615888" style="zoom:80%;" />
+
+
+
+
+
+还可以在application.properties 中配置文件上传的限制
+
+![image-20210621151213015](springboot  学习整理笔记.assets/image-20210621151213015.png)
+
+
+
+
+
+
+
+#### 18.2 多文件上传
+
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <form action="/upload2" method="post" enctype="multipart/form-data">
+        <input type="file" name="files" multiple>
+        <input type="submit" value="上传">
+    </form>
+
+</body>
+</html>
+```
+
+
+
+
+
+```java
+package com.cqp.demo4springboot.fileupload;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.UUID;
+
+/**
+ * @author cqp
+ * @version 1.0.0
+ * @ClassName FileUploadController.java
+ * @Description 文件上传
+ * @createTime 2021年06月21日 13:58:00
+ */
+
+@RestController
+public class FileUploadController2 {
+    SimpleDateFormat sdf = new SimpleDateFormat("/yyyy/MM/dd/");
+    @PostMapping("/upload2")
+    public void upload(MultipartFile[] files, HttpServletRequest req){
+        // 临时目录
+        String realPath = req.getServletContext().getRealPath("/");
+        String format = sdf.format(new Date());
+        String path = realPath + format;
+        File folder = new File(path);
+        if(!folder.exists()){
+            folder.mkdirs();
+        }
+        try {
+            for (MultipartFile file : files) {
+                String oldName = file.getOriginalFilename();
+                System.out.println("oldName:"+oldName);
+                String newName = UUID.randomUUID().toString() + oldName.substring(oldName.lastIndexOf("."));
+                System.out.println("newName:"+newName);
+
+                // 给定文件路径和名称，写入到磁盘上
+                file.transferTo(new File(folder,newName));
+                // 生成文件访问路径 由于部署时才能决定是 http 还是 https 所以不能写死
+                // 动态获取 拼接url
+                String s = req.getScheme() + "://" + req.getServerName() + ":" + req.getServerPort() + format + newName;
+                System.out.println(s);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+}
+```
+
+
+
+#### 18.3 ajax文件上传
+
+![image-20210621155338565](springboot  学习整理笔记.assets/image-20210621155338565.png)
+
+
+
+
+
+
+
+### 19. 异常
+
+
+
+**@ControllerAdvice**   增强controller
+
+功能:
+
+* 全局异常处理
+* 全局数据绑定
+* 全局数据预处理
+
+
+
+#### 19.1  异常处理
+
+ 
+
+```java
+@RestControllerAdvice
+public class MyGlobalException {
+    // 全局异常捕获，也可以捕获特殊的异常
+    @ExceptionHandler(Exception.class)
+    public String customException(Exception e){
+        return e.getMessage();
+    }
+}
+```
+
+
+
+
+
+#### 19.2 全局数据绑定
+
+```java
+@ControllerAdvice
+public class MyGlobalDate {
+    @ModelAttribute("info")
+    public Map<String,String> mydata(){
+        Map<String,String> info = new HashMap<>();
+        info.put("username","cqp");
+        info.put("address","xinchang");
+        return info;
+    }
+}
+```
+
+
+
+
+
+```java
+@RestController
+public class HelloController {
+    @GetMapping("/hello")
+    public void hello(Model model){
+        Map<String, Object> map = model.asMap();
+        Map<String ,String> info = (Map<String, String>) map.get("info");
+        Set<String> keySet = info.keySet();
+        for (String s : keySet) {
+            System.out.println(s + "----"+info.get(s));
+        }
+    }
+}
+```
+
+
+
+
+
+#### 19.3 全局数据预处理
+
+
+
+
+
+   Author Book 都有name属性
+
+springboot接收时会将其拼接在一起。
+
+![image-20210621210825646](springboot  学习整理笔记.assets/image-20210621210825646.png)
+
+
+
+![image-20210621210842118](springboot  学习整理笔记.assets/image-20210621210842118.png)
+
+<img src="springboot  学习整理笔记.assets/image-20210621210808675.png" alt="image-20210621210808675" style="zoom:50%;" />
+
+![image-20210621210755097](springboot  学习整理笔记.assets/image-20210621210755097.png)
+
+
+
+解决方法:
+
+其实应该在设计的时候就应该避免这种情况。但是也可以解决。用@ModelAttribute起别名
+
+
+
+```java
+@ControllerAdvice
+public class MyGlobalDataBind {
+    
+    @InitBinder("b")
+    public void b(WebDataBinder binder){
+        binder.setFieldDefaultPrefix("b.");
+    }
+
+    @InitBinder("a")
+    public void a(WebDataBinder binder){
+        binder.setFieldDefaultPrefix("a.");
+    }
+}
+```
+
+
+
+```java
+@RestController
+public class BookController {
+    @PostMapping("/book")
+    public void addBook(@ModelAttribute("b") Book book,@ModelAttribute("a") Author author){
+        System.out.println("book=" + book);
+        System.out.println("author=" + author);
+    }
+}
+```
+
+
+
+分别绑定了
+
+![image-20210621212423612](springboot  学习整理笔记.assets/image-20210621212423612.png)
+
+
+
+
+
+#### 19.4 异常页面
+
+
+
+先动态后静态 先精确后模糊
+
+
+
+templates/error/404.html
+
+static/error/404.html
+
+templates/error/4xx.html
+
+static/error/4xx.html
+
+![image-20210622135518478](springboot  学习整理笔记.assets/image-20210622135518478.png)
+
+
+
+
+
+#### 19.5 自定义异常数据
+
+4-15
+
+自定义错误数据
+
+MyErrorAttributes extends DefaultErrorAttributes
+
+自定义错误页面
+
+MyErrorViewResolver extends DefaultErrorViewResolver
+
+
+
+```java
+/**
+ * @author cqp
+ * @version 1.0.0
+ * @ClassName MyErrorAttributes.java
+ * @Description 自定义异常数据
+ * @createTime 2021年06月22日 13:59:00
+ */
+
+@Component
+public class MyErrorAttributes extends DefaultErrorAttributes {
+    @Override
+    public Map<String, Object> getErrorAttributes(WebRequest webRequest, ErrorAttributeOptions options) {
+        Map<String, Object> map = super.getErrorAttributes(webRequest, options);
+        if((Integer)map.get("status") == 404){
+            map.put("message","页面不存在");
+        }
+        return map;
+    }
+}
+```
+
+
+
+
+
+```java
+@Component
+public class MyErrorViewResolver extends DefaultErrorViewResolver {
+
+    public MyErrorViewResolver(ApplicationContext applicationContext, WebProperties.Resources resources) {
+
+        super(applicationContext, resources);
+
+    }
+
+
+
+    @Override
+
+    public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+
+        Map<String, Object> map = new HashMap<>();
+
+        map.putAll(model);
+
+        if ((Integer) model.get("status") == 500) {
+
+            map.put("message", "服务器内部错误");
+
+        }
+
+        ModelAndView view = new ModelAndView("javaboy/999",map);
+
+        return view;
+
+    }
+
+}
+```
+
+
+
+
+
+
+
+### 20. cors 跨域
+
+Cross-Origin Resource Sharing
+
+跨域资源共享
+
+域: 协议+域名/IP + 端口
+
+有一个不对就是跨域了。
+
+同源策略: ajax请求只能请求同一个域内的资源
+
+为了防止xss攻击 (用户浏览网页时，网页中内嵌了恶意的代码)。
+
+
+
+当请求不是一个简单请求时，比如说是一次 put 、delete 请求时，
+
+在请求发送前会先来一次预检请求，查看服务端是否支持这个请求。
+
+服务端会回一个请求，告诉客户端支持的请求。客户端收到后再发送。
+
+
+
+后端解决方案:
+
+
+
+1. 特定端口加特定注解
+
+@CrossOrigin("http://localhost:8081")
+
+允许localhost:8081 访问这个接口的数据
+
+```java
+@RestController
+public class HelloController {
+    @CrossOrigin("http://localhost:8081")
+    @GetMapping("/hello")
+    public String hello(){
+        return "hello cors";
+    }
+}
+```
+
+
+
+@CrossOrigin("http://localhost:8081")
+
+在服务端的响应response 头中加入了这行 Access-Control-Allow-Origin: http://localhost:8081
+
+这样浏览器就不会拦截了。
+
+![image-20210622162238816](springboot  学习整理笔记.assets/image-20210622162238816.png)
+
+
+
+
+
+测试一下put 
+
+put请求会预先发送一个option探测请求
+
+
+
+```java
+@PutMapping("/hello")
+public String hello2(){
+    return "hello cors put!需要预先发送探测请求";
+}
+```
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://code.jquery.com/jquery-3.5.1.js" integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc=" crossorigin="anonymous"></script>
+</head>
+<body>
+        <input type="button" onclick="getData()" value="get">
+        <input type="button" onclick="putData()" value="put">
+        <script>
+            function getData(){
+                $.get("http://localhost:8080/hello",function (msg){
+                    alert(msg);
+                })
+            }
+            function putData(){
+                $.ajax({
+                    url:'http://localhost:8080/hello',
+                    type:'put',
+                    success:function (msg){
+                        alert(msg);
+                    }
+                })
+            }
+        </script>
+</body>
+</html>
+```
+
+<img src="springboot  学习整理笔记.assets/image-20210622163717592.png" alt="image-20210622163717592" style="zoom:50%;" />
+
+<img src="springboot  学习整理笔记.assets/image-20210622163732535.png" alt="image-20210622163732535" style="zoom:50%;" />
+
+
+
+<img src="springboot  学习整理笔记.assets/image-20210622163850054.png" alt="image-20210622163850054" style="zoom:80%;" />
+
+
+
+
+
+
+
+
+
+2. 全局配置
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedHeaders("*")
+                .allowedMethods("*")
+                .allowedOrigins("http://localhost:8081")
+                .maxAge(1800);
+    }
+}
+```
+
+  
+
+
+
+3. corsFilter
+
+   ```java
+   @Bean
+   CorsFilter corsFilter() {
+       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+       CorsConfiguration cfg = new CorsConfiguration();
+       cfg.addAllowedOrigin("http://localhost:8081");
+       cfg.addAllowedMethod("*");
+       source.registerCorsConfiguration("/**", cfg);
+       return new CorsFilter(source);
+   }
+   ```
+
+
+
+### 21.参数解析
+
+
+
+由于需要把参数转换为对象进行接收，在转换为对象时，会出现转换的问题。
+
+![image-20210622223936839](springboot  学习整理笔记.assets/image-20210622223936839.png)
+
+![image-20210622223948051](springboot  学习整理笔记.assets/image-20210622223948051.png)
+
+
+
+postman传递因为没有 @responseBody
+
+所以是以key-value形式传递的
+
+<img src="springboot  学习整理笔记.assets/image-20210622224111795.png" alt="image-20210622224111795" style="zoom:80%;" />
+
+
+
+结果报错
+
+![image-20210622224210393](springboot  学习整理笔记.assets/image-20210622224210393.png)
+
+
+
+这是因为前端传的 birthday 是string形式
+
+而 user的birthday是date对象
+
+不匹配，导致错误。
+
+
+
+解决方法: Converter对数据进行转换
+
+```java
+
+/**
+ * @author cqp
+ * @version 1.0.0
+ * @ClassName MyDataConverter.java
+ * @Description 把前端给的 String 2020-01-01 转成 Date 不然报404错误
+ * @createTime 2021年06月22日 21:46:00
+ */
+// Converter<S,T> s:源数据 t:目标对象
+@Component
+public class MyDataConverter implements Converter<String,Date> {
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+    @Override
+    public Date convert(String s) {
+        // 这里的s就是传过来的字符串参数
+        try {
+            return sdf.parse(s);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
+```
+
+springmvc 会根据前端给的数据格式 比如说（2020-01-22）匹配了 yyyy-MM-dd
+
+这样就会转换成 Date 给user对象。 
+
+![image-20210622224717377](springboot  学习整理笔记.assets/image-20210622224717377.png)
+
+
+
+总结:
+
+Post请求，参数可以是 key/value 形式，也可以是 json形式
+
+自定义的类型转换器对 key/value 的参数有效
+
+JSON 形式的参数，不需要类型转换器，json字符串是通过 HttpMessageConverter 转换为 User对象的。
+
+
+
+### 22.路径映射
+
+
+
+可以对web项目路径配置映射
+
+
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+//        registry.addViewController("/02").setViewName("02");
+        registry.addViewController("/02").setViewName("02");
+    }
+}
+```
+
+可以直接访问 http://localhost:8080/02
+
+会直接将/resource/templates下面的02.html页面返回
+
+
+
+
+
+### 23. Session共享 (redis)
+
+
+
+学习链接：http://itboyhub.com/2021/01/25/spring-boot2-spring-session/
+
+在传统的单服务架构中，一般来说，只有一个服务器，那么不存在 Session 共享问题，但是在分布式/集群项目中，Session 共享则是一个必须面对的问题，先看一个简单的架构图：
+
+<img src="springboot  学习整理笔记.assets/image-20210630105336469.png" alt="image-20210630105336469" style="zoom:50%;" />
+
+在这样的架构中，会出现一些单服务中不存在的问题，例如客户端发起一个请求，这个请求到达 Nginx 上之后，被 Nginx 转发到 Tomcat A 上，然后在 Tomcat A 上往 session 中保存了一份数据，下次又来一个请求，这个请求被转发到 Tomcat B 上，此时再去 Session 中获取数据，发现没有之前的数据。对于这一类问题的解决，思路很简单，就是将各个服务之间需要共享的数据，保存到一个公共的地方（主流方案就是 Redis）：
+
+<img src="springboot  学习整理笔记.assets/image-20210630105412199.png" alt="image-20210630105412199" style="zoom:50%;" />
+
+一个简化的方案就是使用 Spring Session 来实现这一功能，Spring Session 就是使用 Spring 中的代理过滤器，将所有的 Session 操作拦截下来，自动的将数据 同步到 Redis 中，或者自动的从 Redis 中读取数据。
+
+对于开发者来说，所有关于 Session 同步的操作都是透明的，开发者使用 Spring Session，一旦配置完成后，具体的用法就像使用一个普通的 Session 一样。
+
+
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.session</groupId>
+        <artifactId>spring-session-data-redis</artifactId>
+    </dependency>
+</dependencies>
+```
+
+```properties
+spring.redis.host=192.168.66.128
+spring.redis.port=6379
+spring.redis.password=123
+spring.redis.database=0
+```
+
+引入了redis 和 session 依赖后，原来session是存在内存中的，现在框架自动把session拦截，存到redis中。
+
+
+
+```java
+@RestController
+public class HelloController {
+    @Value("${server.port}")
+    Integer port;
+    @GetMapping("/set")
+    public String set(HttpSession session) {
+        session.setAttribute("user", "javaboy");
+        return String.valueOf(port);
+    }
+    @GetMapping("/get")
+    public String get(HttpSession session) {
+        return session.getAttribute("user") + ":" + port;
+    }
+}
+```
+
+自动拦截 session的get set 操作
+
+考虑到一会 Spring Boot 将以集群的方式启动 ，为了获取每一个请求到底是哪一个 Spring Boot 提供的服务，需要在每次请求时返回当前服务的端口号，因此这里我注入了 server.port 。
+
+![image-20210630110252387](springboot  学习整理笔记.assets/image-20210630110252387.png)
+
+此时关于 session 共享的配置就已经全部完成了，session 共享的效果我们已经看到了，但是每次访问都是我自己手动切换服务实例，因此，接下来我们来引入 Nginx ，实现服务实例自动切换。  
+
+
+
+**Docker 启动 nginx**
+
+
+
+```bash
+docker run --name mynginx -p 80:80 -d nginx
+docker exec -it mynginx /bin/bash
+cd /etc/nginx/
+cat nginx.conf
+```
+
+
+
+
+
+### 24.RestFul
+
+<img src="springboot  学习整理笔记.assets/image-20210703141708562.png" alt="image-20210703141708562" style="zoom:50%;" />
+
+<img src="springboot  学习整理笔记.assets/image-20210703142531540.png" alt="image-20210703142531540" style="zoom:50%;" />
+
+![image-20210703142709050](springboot  学习整理笔记.assets/image-20210703142709050.png)
+
+
+
+
+
+用jpa+rest 可以直接crud
+
+* 创建实体类
+* 创建dao 继承 JpaRepository
+
+如 实体类 user  （get请求） localhost://localhost:8080/users  查所有用户      
+
+​							  (get请求)     localhost://localhost:8080/users/1  查id =1 的用户
+
+​								(get请求)   localhost://localhost:8080/users?page=0&size=3&sort=id,desc   自带分页查询
+
+
+
+<img src="springboot  学习整理笔记.assets/image-20210703142158746.png" alt="image-20210703142158746" style="zoom:50%;" />
+
+
+
+
+
+添加请求
+
+<img src="springboot  学习整理笔记.assets/image-20210703142312110.png" alt="image-20210703142312110" style="zoom:50%;" />
+
+
+
+修改请求
+
+<img src="springboot  学习整理笔记.assets/image-20210703142420359.png" alt="image-20210703142420359" style="zoom:50%;" />
+
+
+
+删除请求
+
+<img src="springboot  学习整理笔记.assets/image-20210703142445032.png" alt="image-20210703142445032" style="zoom:50%;" />
+
+
+
+并不只是主键查询，jpa支持只要你的声明方法符合jpa规范，就不用写sql了。
+
+![image-20210703144414183](springboot  学习整理笔记.assets/image-20210703144414183.png)
+
+
+
+通过search查询接口访问链接
+
+<img src="springboot  学习整理笔记.assets/image-20210703144449309.png" alt="image-20210703144449309" style="zoom:50%;" />
+
+<img src="springboot  学习整理笔记.assets/image-20210703144527297.png" alt="image-20210703144527297" style="zoom:80%;" />
+
+
+
+嫌弃方法名在访问链接里太长
+
+加注解
+
+![image-20210703144617326](springboot  学习整理笔记.assets/image-20210703144617326.png)
+
+![image-20210703144634635](springboot  学习整理笔记.assets/image-20210703144634635.png)
+
+
+
+还可以屏蔽它给你写好的接口
+
+![image-20210703144746689](springboot  学习整理笔记.assets/image-20210703144746689.png)
+
+
+
+
+
+还可以改这个地方，加注解。(默认规则是 首字母小写后面加s)
+
+![image-20210703144913686](springboot  学习整理笔记.assets/image-20210703144913686.png)
+
+ ![image-20210703145130971](springboot  学习整理笔记.assets/image-20210703145130971.png)
+
+
+
+![image-20210703145212546](springboot  学习整理笔记.assets/image-20210703145212546.png)
+
+
+
+mybatis不支持这样
+
+因为spring-data-关系型数据库只有
+
+jpa
+
+jdbc
+
+
+
+
+
+这些也可以配置
+
+![image-20210703145450791](springboot  学习整理笔记.assets/image-20210703145450791.png)
+
+
+
+
+
+
+
+
+
+
+
+### 25.Redis实现接口幂等性
+
+
+
+接口幂等性:	用户对于同一操作发起的一次请求或者多次请求的结果是一致的，不会因为多次点击二产生副作用。
+
+
+
+​	举个最简单的例子，那就是支付，用户购买商品后支付，支付扣款成功，但是返回结果的时候网络异常，此时钱已经扣了，用户再次点击按钮，此时会进行第二次扣款，返回结果成功，用户查询余额返发现多扣钱了，流水记录也变成了两条,这就没有保证接口的幂等性
+
+
+
+解决方案:
+
+使用redis 存储 token机制实现接口幂等性
+
+1. 生成全局唯一的token,token放到redis或jvm内存,token会在页面跳转时获取.存放到pageScope中,支付请求提交先获取token
+2. 提交后后台校验token，执行提交逻辑,提交成功同时删除token，生成新的token更新redis ,这样当第一次提交后token更新了,页面再次提交携带的token是已删除的token后台验证会失败不让提交
+
+
+
+代码: 6-5 idempontent
+
+
+
+
+
+
+
+
+
+### 26.动态代理
+
+
+
+ 静态代理: 代理类与被代理类在代码运行前就已经决定了。编译期确定。
+
+动态代理: 代理类在程序运行的时候生成。运行时才知道代理什么。
+
+
+
+#### 静态代理
+
+接口（包含需要代理的方法）
+
+被代理类: 实现这个接口的类
+
+代理类: 实现这个接口，并且包含被代理类的实例对象，重写接口方法时，调用被代理类的实例对象，在其前后可以做一系列其余的工作。
+
+```java
+public interface Calculator {
+    //需要代理的接口
+    public int add(int a,int b);
+    //接口实现类,执行真正的a+b操作
+    public static class CalculatorImpl implements Calculator{
+        @Override
+        public int add(int a, int b) {
+            System.out.println("doing ");
+            return a+b;
+        }
+    }
+    //静态代理类的实现.代码已经实现好了.
+    public static class CalculatorProxy implements Calculator{
+        private Calculator calculator;
+        public CalculatorProxy(Calculator calculator) {
+            this.calculator=calculator;
+        }
+        @Override
+        public int add(int a, int b) {
+            //执行一些操作
+            System.out.println("begin ");
+            int result = calculator.add(a, b);
+            System.out.println("end ");
+            return result;
+        }
+    }
+}
+```
+
+
+
+
+
+#### 动态代理
+
+> 动态代理的优势是实现无侵入式的代码扩展，做方法的增强；让你可以在不用修改源码的情况下，增强一些方法；在方法的前后你可以做你任何想做的事情（甚至不去执行这个方法就可以）。
+
+
+
+##### JDK Proxy
+
+
+
+接口 声明被代理的方法
+
+```java
+public interface Moveable {
+    void move();
+}
+```
+
+
+
+被代理类 实现接口方法，做实际的操作
+
+```java
+public class Car implements Moveable {
+    @Override
+    public void move() {
+        // 开车
+        try {
+            Thread.sleep(new Random().nextInt(1000));
+            System.out.println("汽车行驶中");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+
+
+InvocationHandler 中的invoke 做方法的增强
+
+```java
+/**
+ * @author cqp
+ * @version 1.0.0
+ * @ClassName TimeHandler.java
+ * @Description 动态代理
+ * 在运行时通过反射实现动态代理，可以代理任何对象
+ *
+ * @createTime 2021年06月01日 10:11:00
+ */
+public class TimeHandler implements InvocationHandler {
+    private Object target;
+
+    public TimeHandler(Object target) {
+        this.target = target;
+    }
+
+    /**
+     *
+     * @param proxy 被代理对象
+     * @param method 被代理对象的方法
+     * @param args 方法的参数
+     * @return
+     * @throws Throwable
+     */
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+
+        long starttime = System.currentTimeMillis();
+        System.out.println("汽车开始行驶....");
+        method.invoke(target);
+        long endtime = System.currentTimeMillis();
+        System.out.println("汽车结束行驶....  汽车行驶时间：" + (endtime - starttime) + "毫秒！");
+        return null;
+    }
+}
+```
+
+
+
+
+
+测试
+
+```java
+ * 动态代理实现思路
+ * 实现功能: 通过Proxy的 newProxyInstance返回代理对象
+ * 1. 声明一段源码 (动态产生代理)
+ * 2. 编译源码(JDK Compiler API)，产生新的类(代理类)
+ * 3. 将这个类load到内存中，产生一个新的对象 (代理对象)
+ * 4. return 代理对象
+ *
+ * @createTime 2021年06月01日 10:37:00
+ */
+public class JDKProxyTest {
+    public static void main(String[] args) {
+        Car car = new Car();  // 被代理类 实现了Moveable接口
+        InvocationHandler h = new TimeHandler(car); // 执行者 增强Moveable接口下方法的功能
+        // 代理类
+        Moveable m = (Moveable) Proxy.newProxyInstance(car.getClass().getClassLoader(), car.getClass().getInterfaces(), h);
+        m.move();
+        //System.out.println(m.toString()); 对 toString() equals() hashCode() 方法也会进行handler.invoke()中的代理逻辑处理
+    }
+}
+```
+
+
+
+源码分析:
+
+
+
+```java
+Moveable m = (Moveable) Proxy.newProxyInstance(car.getClass().getClassLoader(), car.getClass().getInterfaces(), h);
+```
+
+**newProxyinstance 方法传入 car被代理类的 classloader  interface invocationhandler 是如何生成的代理对象？**
+
+
+
+```java
+public static Object newProxyInstance(ClassLoader loader,
+                                          Class<?>[] interfaces,
+                                          InvocationHandler h)
+        throws IllegalArgumentException
+    {
+        Objects.requireNonNull(h);   // 1.
+
+        final Class<?>[] intfs = interfaces.clone(); // 2.
+        final SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            checkProxyAccess(Reflection.getCallerClass(), loader, intfs);
+        }
+
+        /*
+         * Look up or generate the designated proxy class.
+         */
+        Class<?> cl = getProxyClass0(loader, intfs);     // 3.
+
+        /*
+         * Invoke its constructor with the designated invocation handler.
+         */
+        try {
+            if (sm != null) {
+                checkNewProxyPermission(Reflection.getCallerClass(), cl);
+            }
+
+            final Constructor<?> cons = cl.getConstructor(constructorParams);  // 4. 
+            final InvocationHandler ih = h;                                   // 5.
+            if (!Modifier.isPublic(cl.getModifiers())) {
+                AccessController.doPrivileged(new PrivilegedAction<Void>() {
+                    public Void run() {
+                        cons.setAccessible(true);
+                        return null;
+                    }
+                });
+            }
+            return cons.newInstance(new Object[]{h});          // 6.
+```
+
+
+
+1. 对 Innovacationhandler 做判空处理
+2. 复制传入的接口
+3. 根据 类加载器和接口对象在 jvm缓存中生成一个类对象
+4. 获取这个类对象的构造器
+5. InvacationHandler的引用
+6. 把 InvactionHandler作为参数传入构造器，构造器 newInstance 实例化代理对象
+
+
+
+**这个代理对象又是怎样调用 invoke方法，如何实现方法增强?**
+
+分析生成的代理对象
+
+这个地方通过这段代码将Proxy0的class字节码输出到文件。
+
+```java
+
+byte[] classFile = ProxyGenerator.generateProxyClass("$Proxy0", WeiboProvider.class.getInterfaces());
+String path = "C:**/IdeaProjects/study/out/production/study/SimpleProxy.class";
+try(FileOutputStream fos = new FileOutputStream(path)) {
+    fos.write(classFile);
+    fos.flush();
+    System.out.println("代理类class文件写入成功");
+   } catch (Exception e) {
+     System.out.println("写文件错误");
+ }
+```
+
+
+
+
+
+反编译Proxy0如下：
+
+```java
+//Proxy0 是动态生成的类，继承自Proxy，实现了IProvider接口
+public final class $Proxy0 extends Proxy implements IProvider {
+    private static Method m1;
+    private static Method m2;
+    private static Method m3;
+    private static Method m0;
+
+    public $Proxy0(InvocationHandler var1) throws  {
+        super(var1);
+    }
+
+    public final boolean equals(Object var1) throws  {
+        try {
+            return ((Boolean)super.h.invoke(this, m1, new Object[]{var1})).booleanValue();
+        } catch (RuntimeException | Error var3) {
+            throw var3;
+        } catch (Throwable var4) {
+            throw new UndeclaredThrowableException(var4);
+        }
+    }
+
+    public final String toString() throws  {
+        try {
+            return (String)super.h.invoke(this, m2, (Object[])null);
+        } catch (RuntimeException | Error var2) {
+            throw var2;
+        } catch (Throwable var3) {
+            throw new UndeclaredThrowableException(var3);
+        }
+    }
+
+    public final String getData(String var1) throws  {
+        try {
+            //m3就是IProvider 接口的getData方法 
+            //super.h 是父类java.lang.reflect.Proxy的属性 InvocationHandler
+            return (String)super.h.invoke(this, m3, new Object[]{var1});
+        } catch (RuntimeException | Error var3) {
+            throw var3;
+        } catch (Throwable var4) {
+            throw new UndeclaredThrowableException(var4);
+        }
+    }
+
+    public final int hashCode() throws  {
+        try {
+            return ((Integer)super.h.invoke(this, m0, (Object[])null)).intValue();
+        } catch (RuntimeException | Error var2) {
+            throw var2;
+        } catch (Throwable var3) {
+            throw new UndeclaredThrowableException(var3);
+        }
+    }
+
+    static {
+        try {
+            m1 = Class.forName("java.lang.Object").getMethod("equals", new Class[]{Class.forName("java.lang.Object")});
+            m2 = Class.forName("java.lang.Object").getMethod("toString", new Class[0]);
+            //m3就是IProvider 接口的getData方法
+            m3 = Class.forName("aop.IProvider").getMethod("getData", new Class[]{Class.forName("java.lang.String")});
+            m0 = Class.forName("java.lang.Object").getMethod("hashCode", new Class[0]);
+        } catch (NoSuchMethodException var2) {
+            throw new NoSuchMethodError(var2.getMessage());
+        } catch (ClassNotFoundException var3) {
+            throw new NoClassDefFoundError(var3.getMessage());
+        }
+    }
+}
+```
+
+
+
+静态代码块加载每个方法的 Method对象 包括(equals() toString() hashCode())  和 一开始接口里的方法 （这里是 getData()）
+
+getData在这里调用invocationHandler的 invoke方法  m3通过反射拿到method方法 
+
+```java
+  public final String getData(String var1) throws  {
+        try {
+            //m3就是IProvider 接口的getData方法 
+            //super.h 是父类java.lang.reflect.Proxy的属性 InvocationHandler
+            return (String)super.h.invoke(this, m3, new Object[]{var1});
+        } catch (RuntimeException | Error var3) {
+            throw var3;
+        } catch (Throwable var4) {
+            throw new UndeclaredThrowableException(var4);
+        }
+    }
+```
+
+
+
+**总结:**
+
+1. 写一个InnovacationHandler 在其invoke()方法里实现需要增强的功能
+2. JDK的 Proxy类去 newProxyInstance，传入被代理对象的 classloader 、 interface 、innovacationHandler
+3. 根据 classloader 和 interface 在jvm生成代理类，并且传入 innovacation 引用
+4. 生成的代理类如果调用了 那个被增强的方法，在代理类内部会调用 innovationhandler的 invoke()方法，执行我们写在 innovacationHandler 中的增强功能，innovacationHandler 中的 method.invoke 是我们原本的业务代码
+5. 生成的代理类不知会代理我们接口里定义的方法，还会增强 toString() HashCode() equals() 方法
+
+
+
+**jdk实现动态代理的限制**
+
+* 只能代理有接口的类，对接口下的方法实现增强
+
+  
+
+##### CGLib 实现动态代理
+
+如果一个类没有实现接口怎么办？JDKProxy 无法对其代理。
+
+JDK的代理类的实现方式是实现相关的接口成为接口的实现类。
+
+CGLib使用继承的方式实现相关的代理类。
+
+
+
+需要代理的类
+
+```java
+public class Train {
+
+    public void move(){
+        System.out.println("火车行驶中......");
+    }
+
+    public void aaa(){
+        System.out.println("啊啊啊啊啊");
+    }
+}
+```
+
+
+
+Cglib代理类
+
+```java
+public class CglibProxy implements MethodInterceptor {
+     // 创建代理类
+     private Enhancer enhancer = new Enhancer();
+
+     public Object getProxy(Class clazz){
+         // 设置创建子类(代理类)的类
+         enhancer.setSuperclass(clazz);
+         enhancer.setCallback(this);
+         return enhancer.create();
+     }
+
+    /**
+     *  拦截所有目标类方法的调用
+     * @param obj     增强的对象
+     * @param method  被拦截的方法
+     * @param args    被拦截方法的参数
+     * @param proxy   代理   触发父类的方法对象
+     * @return
+     * @throws Throwable
+     */
+    @Override
+    public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy) throws Throwable {
+
+
+        System.out.println("日志开始......");
+        // 代理类调用父类(需要增强的对象)方法
+        proxy.invokeSuper(obj, args);
+        System.out.println("日志结束......");
+        return null;
+    }
+}
+```
+
+
+
+
+
+测试
+
+```java
+ public static void main(String[] args) {
+        CglibProxy proxy = new CglibProxy();
+        Train t  = (Train) proxy.getProxy(Train.class);
+        t.move();
+        t.aaa();
+    }
+```
+
+
+
+实验结果 
+
+![image-20210819151838294](springboot  学习整理笔记.assets/image-20210819151838294.png)
+
+
+
+**原理分析**
+
+CGLIB底层使用了ASM（一个短小精悍的字节码操作框架）来操作字节码生成新的类
+
+
+
+
+
+原理图
+
+![e2f365f18c088dc64d698d80cee481e6](springboot  学习整理笔记.assets/e2f365f18c088dc64d698d80cee481e6.jpeg)
 

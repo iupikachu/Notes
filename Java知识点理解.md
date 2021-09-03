@@ -255,3 +255,29 @@ public class TestDowbWildCard {
 ​      Session 是单体应用 无法微服务
 
 ![image-20210204101818782](Java知识点理解.assets/image-20210204101818782.png)
+
+
+
+
+
+### 4.aop
+
+
+
+aop基于动态代理实现
+
+
+
+* jdk动态代理实现
+  * 只能代理实现了接口的类
+  * 没有实现接口的类不能实现jdk的动态代理
+* cglib动态代理实现
+  * 针对类实现代理  
+  * 对指定目标类产生一个子类，通过方法拦截技术拦截所有父类方法的调用
+
+
+
+springboot中 **@configuration** 就是使用cglib对加了@configuration的类进行了代理，用增强的类替换原本的类。
+
+<img src="Java知识点理解.assets/image-20210613142313187.png" alt="image-20210613142313187" style="zoom:50%;" />
+

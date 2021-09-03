@@ -85,10 +85,15 @@ option cmd L 格式化代码
 
 control shift space 智能补全
 
-control h 显示代码结构
+control h 显示类继承实现结构
 
 
 
 
 
 cmd shift > 显示隐藏文件
+
+cmd option t 包围代码   if for try/catch
+
+cmd shift u 小写
+
